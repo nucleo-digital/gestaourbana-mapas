@@ -1,0 +1,5 @@
+node_modules
+node
+.env
+assets/bower_components/*
+!assets/bower_components/.gitkeep

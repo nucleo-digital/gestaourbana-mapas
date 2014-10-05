@@ -1,0 +1,48 @@
+{
+  "name": "gestaourbana-mapas",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "test": "mocha"
+  },
+  "description": "Gestão Urbana Mapas",
+  "directories": {
+    "test": "test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nucleo-digital/gestaourbana-mapas"
+  },
+  "keywords": [
+    "openstreetmaps",
+    "layers"
+  ],
+  "author": "Lucas Pirola <lucaspirola@gmail.com>",
+  "license": "GPL v3",
+  "bugs": {
+    "url": "https://github.com/nucleo-digital/gestaourbana-mapas/issues"
+  },
+  "dependencies": {
+    "express": "~4.2.0",
+    "static-favicon": "~1.0.0",
+    "cookie-parser": "~1.0.1",
+    "body-parser": "~1.0.0",
+    "debug": "~0.7.4",
+    "jade": "~1.3.0",
+    "morgan": "~1.3.2",
+    "winston": "~0.8.0",
+    "mongoose": "~3.8.13",
+    "gulp-sass": "~0.7.2",
+    "gulp": "~3.8.6",
+    "bower": "~1.3.8",
+    "gulp-autoprefixer": "0.0.8",
+    "gulp-imagemin": "~0.6.1",
+    "vinyl-source-stream": "~0.1.1",
+    "browserify": "~4.2.3",
+    "dotenv": "~0.4.0"
+  },
+  "devDependencies": {
+    "mocha": "~1.18.2",
+    "gulp-svgmin": "~0.4.6"
+  }
+}

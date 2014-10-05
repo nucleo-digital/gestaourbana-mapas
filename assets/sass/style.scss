@@ -1,0 +1,133 @@
+@import "responsive";
+
+@import "../bower_components/Font-Awesome/scss/font-awesome.scss";
+
+
+@font-face {
+    font-family: 'museo_sans500';
+    src: url('../fonts/MuseoSans_500-webfont.eot');
+    src: url('../fonts/MuseoSans_500-webfont.eot?#iefix') format('embedded-opentype'),
+         url('../fonts/MuseoSans_500-webfont.woff2') format('woff2'),
+         url('../fonts/MuseoSans_500-webfont.woff') format('woff'),
+         url('../fonts/MuseoSans_500-webfont.ttf') format('truetype'),
+         url('../fonts/MuseoSans_500-webfont.svg#museo_sans500') format('svg');
+    font-weight: normal;
+    font-style: normal;
+
+}
+@font-face {
+    font-family: 'museo300';
+    src: url('../fonts/Museo300-Regular-webfont.eot');
+    src: url('../fonts/Museo300-Regular-webfont.eot?#iefix') format('embedded-opentype'),
+         url('../fonts/Museo300-Regular-webfont.woff2') format('woff2'),
+         url('../fonts/Museo300-Regular-webfont.woff') format('woff'),
+         url('../fonts/Museo300-Regular-webfont.ttf') format('truetype'),
+         url('../fonts/Museo300-Regular-webfont.svg#museo300') format('svg');
+    font-weight: normal;
+    font-style: normal;
+
+}
+
+
+$cinza: #CBCBCB;
+$verde_claro: #cec399;
+$verde_escuro: #343416;
+$verde_amarelado: #ABA935;
+
+// @import "../../public/icons/styles";
+// @import "../../public/fonts/styles";
+// font-family: 'museo300';
+
+html {
+    font-family: 'museo_sans500';
+    color: #333;
+    background-color: #F5F5F5;
+}
+
+a {
+    color: #666;
+    text-decoration: none;
+    font-family: 'museo300';
+
+    &:hover {
+        text-decoration: underline;
+    }
+}
+
+.header {
+    box-shadow: 0px 3px 3px 0 rgba(153,153,153,.75);
+    background-color: #fff;
+    .menu {
+        margin: 10px 0;
+        li {
+            display: inline;
+            padding: 5px 7px;
+            border-right: 1px dotted #666;
+
+            .fa {
+                font-weight: bold;
+                margin-right: 5px;
+            }
+
+            &:last-child {
+                border-right: none;
+            }
+        }
+    }
+
+    h1 {
+        padding: 0 0 15px;
+        margin: 0;
+        text-align: center;
+    }
+}
+
+#compartilhar {
+    min-height: 30px;
+    padding: 10px 0;
+    font-family: 'museo300';
+    color: #999;
+    text-align: right;
+
+    a {
+        text-align: center;
+        font-size: 16px;
+        line-height: 16px;
+        margin: 5px;
+        padding: 7px;
+        border-radius: 50px;
+        background-color: #F6F7F8;
+        i {
+            width: 16px;
+            height: 16px;
+            color: #A6A6A6;
+        }
+    }
+}
+
+.footer {
+    background-color: #fff;
+    color: #666;
+    bottom:0;
+    width: 100%;
+    position: fixed;
+    padding: 8px 0;
+    p {
+        margin: 0;
+    }
+    .licenca {
+        p {
+            margin: 6px 10px 6px 0;
+        }
+    }
+    .realizacao,
+    .apoio {
+        text-align: right;
+        p {
+            margin-right: 10px;
+        }
+    }
+    p {
+        font-size: 14px;
+    }
+}
