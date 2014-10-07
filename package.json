@@ -39,7 +39,8 @@
     "gulp-imagemin": "~0.6.1",
     "vinyl-source-stream": "~0.1.1",
     "browserify": "~4.2.3",
-    "dotenv": "~0.4.0"
+    "dotenv": "~0.4.0",
+    "mongoose-geojson-schema": "0.0.2"
   },
   "devDependencies": {
     "mocha": "~1.18.2",
