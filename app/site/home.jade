@@ -1,3 +1,24 @@
 extends ../layout
 block body
     #map
+
+    .sidebar
+
+        button(data-dropdown-target="#collapse3", data-dropdown-dimension="width") Click me to toggle
+        #collapse3.collapse.width
+            .dropdown-width-example
+                p
+                |   Lorem ipsum dolor sit amet...
+        .accordion
+            .accordion-head
+                a(data-dropdown-target='#cllps1', data-dropdown-parent='.accordion-group', href='#')
+                    | Accordion Header Trigger
+            #cllps1.accordion-body.accordion-group
+                p
+                    | Lorem ipsum dolor sit amet...
+            .accordion-head
+                a(data-dropdown-target='#cllps2', data-dropdown-parent='.accordion-group', href='#')
+                    | Accordion Header Trigger
+            #cllps2.accordion-body.collapse.accordion-group
+                p
+                    | Lorem ipsum dolor sit amet...
