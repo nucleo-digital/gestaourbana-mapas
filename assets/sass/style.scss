@@ -90,7 +90,8 @@ a {
     z-index: -99;
 }
 
-.sidebar {
+#sidebar {
+    position: absolute;
     background-color: #fff;
     box-shadow: 3px 3px 3px 0 rgba(153,153,153,.75);
     width: 320px;

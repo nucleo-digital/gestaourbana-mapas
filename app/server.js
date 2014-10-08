@@ -26,7 +26,7 @@ app.set("view engine", "jade");
 //Load the routes ("controllers" -ish)
 [
   "app/users/routes",
-  "app/vehicles/routes",
+  "app/group_layers/routes",
   "app/layers/routes",
   "app/deals/routes",
   "app/site/routes"
