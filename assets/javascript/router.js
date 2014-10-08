@@ -40,6 +40,14 @@ var router = Backbone.Router.extend({
         tagName: 'div',
         el: '#sidebar',
         template:  _.template( jQuery('#accordion-group-layers').html()),
+        events: {
+            'click a.layer': "loadLayer"
+        },
+        loadLayer : function (e) {
+            e.preventDefault();
+            // L.geoJson().addTo(map);
+            console.log(e.currentTarget.href);
+        },
         initialize: function() {
             this.render();
         },
@@ -51,7 +59,6 @@ var router = Backbone.Router.extend({
 
     groups.fetch({ success : function (model, response, options) {
             var s = new SidebarView({model:groups});
-            // L.geoJson(geojsonFeature).addTo(map);
         }
     });
   },

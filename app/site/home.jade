@@ -13,6 +13,7 @@ block body
                 .accordion-body.dropdown-group(id!="<%= group._id %>")
                     ul
                         <% _.each(group.layers, function(layer) { %>
-                        li <%= layer.name %>
+                        li
+                            a.layer(href!="/layer/<%= layer._id %>") <%= layer.name %>
                         <% }); %>
             <% }); %>
