@@ -98,6 +98,8 @@ a {
     margin: 15px;
     max-height: 400px;
     min-height: 300px;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 #compartilhar {

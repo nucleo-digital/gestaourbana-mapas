@@ -34,54 +34,26 @@ var router = Backbone.Router.extend({
         url: '/groups'
     });
 
-    var GroupLayerCollection = Backbone.Collection.extend({
-        model: GroupLayer,
-    });
-
     var groups = new GroupLayer();
 
     var SidebarView = Backbone.View.extend({
         tagName: 'div',
-        el: '.sidebar',
-        model : GroupLayer,
-        template: '#accordions',
+        el: '#sidebar',
+        template:  _.template( jQuery('#accordion-group-layers').html()),
+        initialize: function() {
+            this.render();
+        },
         render: function() {
-            this.$el.html(this.template(this.model.attributes));
+            this.$el.html(this.template({groups: this.model.toJSON()}));
             return this;
         }
     });
 
-// _.template('<div class="accordion-group">
-//     <div class="accordion">
-//         <div class="accordion-head">
-//             <a data-dropdown-target="#cllps1" data-dropdown-parent=".accordion-group" href="#">Accordion Header Trigger</a>
-//         </div>
-//         <div id="cllps1" class="accordion-body dropdown-group"><p>Lorem ipsum dolor sit amet...</p></div>
-//     </div>
-//     <div class="accordion">
-//         <div class="accordion-head">
-//             <a  data-dropdown-target="#cllps2" data-dropdown-parent=".accordion-group" href="#">Accordion Header Trigger</a>
-//         </div>
-//         <div id="cllps2" class="accordion-body collapse dropdown-group"><p>Lorem ipsum dolor sit amet...</p></div>
-//     </div>
-// </div>')
-
-
-
     groups.fetch({ success : function (model, response, options) {
-            console.log(response);
-            // (groups.toJSON());
-                var s = new SidebarView({el:document.getElementById('#sidebar')});
-                console.log(s);
+            var s = new SidebarView({model:groups});
+            // L.geoJson(geojsonFeature).addTo(map);
         }
     });
-
-
-
-
-
-
-    $(document.body).append("Index route has been called..");
   },
 
   show: function(id){

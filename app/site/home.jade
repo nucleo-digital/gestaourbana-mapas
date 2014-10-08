@@ -3,18 +3,16 @@ block body
     #map
 
     #sidebar
+
+    script(type="text/template", id="accordion-group-layers")
         .accordion-group
+            <% _.each(groups, function(group) { %>
             .accordion
                 .accordion-head
-                    a(data-dropdown-target='#cllps1', data-dropdown-parent='.accordion-group', href='#')
-                        | Accordion Header Trigger
-                #cllps1.accordion-body.dropdown-group
-                    p
-                        | Lorem ipsum dolor sit amet...
-            .accordion
-                .accordion-head
-                    a(data-dropdown-target='#cllps2', data-dropdown-parent='.accordion-group', href='#')
-                        | Accordion Header Trigger
-                #cllps2.accordion-body.collapse.dropdown-group
-                    p
-                        | Lorem ipsum dolor sit amet...
+                    a(data-dropdown-target!='#<%= group._id %>', data-dropdown-parent='.accordion-group', href='#') <%= group.name %>
+                .accordion-body.dropdown-group(id!="<%= group._id %>")
+                    ul
+                        <% _.each(group.layers, function(layer) { %>
+                        li <%= layer.name %>
+                        <% }); %>
+            <% }); %>
