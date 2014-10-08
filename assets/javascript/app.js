@@ -1,6 +1,8 @@
 var jQuery = window.jQuery;
 
-var L = require('../bower_components/leaflet/dist/leaflet-src');
+require('../bower_components/responsive/build/responsive.min');
+
+var L = require('../bower_components/leaflet/dist/leaflet');
 
 var map = L.map('map').setView([51.505, -0.09], 13);
 

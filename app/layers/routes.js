@@ -7,8 +7,8 @@ function createCustomer(req, res) {
 }
 
 function setup(app) {
-  app.post('/customers', createCustomer);
-  app.get('/customers', getCustomers);
+  // app.post('/customers', createCustomer);
+  app.get('/layers/groups', getCustomers);
 }
 
 module.exports = setup;
