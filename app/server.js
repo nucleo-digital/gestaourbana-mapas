@@ -27,7 +27,7 @@ app.set("view engine", "jade");
 [
   "app/users/routes",
   "app/vehicles/routes",
-  "app/customers/routes",
+  "app/layers/routes",
   "app/deals/routes",
   "app/site/routes"
 ].forEach(function (routePath) {
