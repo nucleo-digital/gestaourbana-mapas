@@ -3,7 +3,9 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "test": "mocha"
+    "start": "node app/server.js",
+    "test": "mocha",
+    "postinstall": "bower install && gulp"
   },
   "description": "Gestão Urbana Mapas",
   "directories": {

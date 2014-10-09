@@ -1,4 +1,14 @@
 var _ = require('underscore');
+var L = require('../bower_components/leaflet/dist/leaflet');
+
+var map = L.map('map').setView([-23.445080344117105, -46.78013442158101], 13);
+
+// add an OpenStreetMap tile layer
+L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
+}).addTo(map);
+
+var L_layer_group = L.layerGroup().addTo(map);
 
 var Backbone = window.Backbone;
 
@@ -18,7 +28,9 @@ var router = Backbone.Router.extend({
             'name': 'Empty Layer',
             'features': {},
             'created_at': Date.now
-        }
+        },
+        idAttribute: "_id",
+        urlRoot: '/layer'
     });
 
     var LayerCollection = Backbone.Collection.extend({
@@ -31,6 +43,7 @@ var router = Backbone.Router.extend({
             'layers': new LayerCollection(),
             'created_at':  Date.now
         },
+        idAttribute: "_id",
         url: '/groups'
     });
 
@@ -45,8 +58,43 @@ var router = Backbone.Router.extend({
         },
         loadLayer : function (e) {
             e.preventDefault();
-            // L.geoJson().addTo(map);
-            console.log(e.currentTarget.href);
+            var layer_id = jQuery(e.currentTarget).data('layer-id');
+            var layer = new Layer({'_id':layer_id});
+            layer.fetch({ success : function (model, response, options) {
+var colors = [
+'#8dd3c7',
+'#ffffb3',
+'#bebada',
+'#fb8072',
+'#80b1d3',
+'#fdb462',
+'#b3de69',
+'#fccde5',
+'#d9d9d9',
+'#bc80bd',
+'#ccebc5',
+'#ffed6f'];
+                    var myStyle = {
+                        "color": _.sample(colors, 1),
+                        "weight": 3,
+                        "opacity": 0.9
+                    };
+
+                    if (L_layer_group.hasLayer(layer_id)) {
+                        L_layer_group.removeLayer(layer_id);
+                    } else {
+                        var myLayer = L.geoJson(response[0].features, {
+                            style: myStyle
+                        });
+                        myLayer._leaflet_id = layer_id;
+
+                        L_layer_group.addLayer(myLayer);
+
+                        map.fitBounds(myLayer.getBounds());
+                    }
+                }
+            });
+
         },
         initialize: function() {
             this.render();

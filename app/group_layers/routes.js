@@ -1,5 +1,5 @@
 var LayerModel = require('../layers/LayerModel');
-var GroupLayer = require('./GroupLayer');
+var GroupLayer = require('./GroupLayerModel');
 
 function getGroups(req, res) {
     GroupLayer.find({}).populate('layers', 'name').exec(function(err, results) {
