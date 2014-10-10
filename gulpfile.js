@@ -172,3 +172,5 @@ gulp.task('default', ['sass', 'images', 'browserify', 'svg'], function() {
         );
     });
 });
+
+gulp.task('build', ['sass', 'images', 'browserify', 'svg']);
