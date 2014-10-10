@@ -3,9 +3,10 @@ block body
     #map
 
     #sidebar
+        .theme
+        .accordion-group
 
     script(type="text/template", id="accordion-group-layers")
-        .accordion-group
             <% _.each(groups, function(group) { %>
             .accordion
                 .accordion-head
@@ -17,4 +18,13 @@ block body
                             a.layer(data-layer-id!="<%= layer._id %>",href!="/layer/<%= layer._id %>")
                                 | <%= layer.name %>
                         <% }); %>
+            <% }); %>
+
+    script(type="text/template", id="theme-active")
+        h3 <%= name %>
+        ul
+            <% _.each(layers, function(layer) { %>
+            li
+                a.layer(data-layer-id!="<%= layer._id %>",href!="/layer/<%= layer._id %>")
+                    | <%= layer.name %>
             <% }); %>

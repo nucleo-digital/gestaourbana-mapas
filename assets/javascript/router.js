@@ -49,9 +49,9 @@ var router = Backbone.Router.extend({
 
     var groups = new GroupLayer();
 
-    var SidebarView = Backbone.View.extend({
+    var AccordionView = Backbone.View.extend({
         tagName: 'div',
-        el: '#sidebar',
+        el: '.accordion-group',
         template:  _.template( jQuery('#accordion-group-layers').html()),
         events: {
             'click a.layer': "loadLayer"
@@ -100,7 +100,7 @@ var router = Backbone.Router.extend({
     });
 
     groups.fetch({ success : function (model, response, options) {
-            var s = new SidebarView({model:groups});
+            var s = new AccordionView({model:groups});
         }
     });
   },
