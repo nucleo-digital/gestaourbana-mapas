@@ -44,7 +44,8 @@
     "dotenv": "~0.4.0",
     "mongoose-geojson-schema": "0.0.2",
     "underscore": "~1.7.0",
-    "gulp-svgmin": "~0.4.6"
+    "gulp-svgmin": "~0.4.6",
+    "imagemin-gifsicle": "~2.0.0"
   },
   "devDependencies": {
     "mocha": "~1.18.2",
