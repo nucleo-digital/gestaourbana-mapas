@@ -5,7 +5,7 @@
   "scripts": {
     "start": "node app/server.js",
     "test": "mocha",
-    "postinstall": "bower install && gulp"
+    "postinstall": "bower install && gulp build"
   },
   "description": "Gestão Urbana Mapas",
   "directories": {
