@@ -2,7 +2,7 @@ var _ = require('underscore');
 var L = require('../bower_components/leaflet/dist/leaflet');
 
 var map = L.map('map').setView([-23.445080344117105, -46.78013442158101], 13);
-
+L.Icon.Default.imagePath = '/images/leaflet';
 // add an OpenStreetMap tile layer
 L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', {
     attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
@@ -76,7 +76,7 @@ var router = Backbone.Router.extend({
 
                 if (L_layer_group.hasLayer(layer_id)) {
                     L_layer_group.removeLayer(layer_id);
-                    link.css({'background-color':'#fff'});
+                    link.css({'background-color':''});
                 } else {
                     link.css({'background-color':current_color});
                     var myLayer = L.geoJson(response[0].features, {
@@ -145,6 +145,12 @@ var router = Backbone.Router.extend({
                     L_layer_group.removeLayer(layer_id);
                     link.css({'background-color':'#fff'});
                 } else {
+                    // var baseballIcon = L.icon({
+                    //     iconUrl: 'baseball-marker.png',
+                    //     iconSize: [32, 37],
+                    //     iconAnchor: [16, 37],
+                    //     popupAnchor: [0, -28]
+                    // });
                     link.css({'background-color':current_color});
                     var myLayer = L.geoJson(response[0].features, {
                         style: myStyle

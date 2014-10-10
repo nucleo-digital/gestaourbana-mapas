@@ -96,22 +96,39 @@ a {
     box-shadow: 3px 3px 3px 0 rgba(153,153,153,.75);
     width: 320px;
     margin: 15px;
-    max-height: 400px;
-    min-height: 300px;
+    height: 500px;
     overflow-y: auto;
     overflow-x: hidden;
+
+    .theme {
+        box-shadow: 0px 3px 3px 0 rgba(153,153,153,.75);
+        padding: 15px;
+
+        h3 {
+            margin: 0;
+        }
+
+        ul {
+            padding: 0;
+            margin:0;
+            li {
+                list-style: none;
+            }
+        }
+    }
 
     .accordion {
         border:0;
 
         .accordion-head {
-            border-bottom: 0;
+            border-color: #ccc;
             background-color: #E8E8E8;
             color: #666;
-            margin: 3px;
+            margin: 0;
         }
 
         .accordion-body {
+
             ul {
                 padding:0;
                 li {
@@ -119,7 +136,7 @@ a {
                     a {
                         // white-space: nowrap;
                         display:block;
-                        padding: 3px;
+                        padding: 4px;
                         border-radius: 5px;
                         margin: 2px;
 
