@@ -21,9 +21,9 @@ block body
             <% }); %>
 
     script(type="text/template", id="theme-active")
-        h3 <%= name %>
+        h3 <%= theme.name %>
         ul
-            <% _.each(layers, function(layer) { %>
+            <% _.each(theme.layers, function(layer) { %>
             li
                 a.layer(data-layer-id!="<%= layer._id %>",href!="/layer/<%= layer._id %>")
                     | <%= layer.name %>

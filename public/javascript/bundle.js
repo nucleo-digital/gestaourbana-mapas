@@ -1790,6 +1790,73 @@ var router = Backbone.Router.extend({
             var s = new AccordionView({model:groups});
         }
     });
+
+    var Theme = Backbone.Model.extend({
+        attributes : {
+            'name': 'Empty Theme',
+            'layers': new LayerCollection(),
+            'created_at':  Date.now
+        },
+        idAttribute: "_id",
+        url: '/themes/active'
+    });
+
+    var theme_active = new Theme();
+
+    var ThemeView = Backbone.View.extend({
+        tagName: 'div',
+        el: '.theme',
+        template:  _.template( jQuery('#theme-active').html()),
+        events: {
+            'click a.layer': "loadLayer"
+        },
+        loadLayer : function (e) {
+            e.preventDefault();
+            var link = jQuery(e.currentTarget);
+
+            var layer_id = link.data('layer-id');
+            var layer = new Layer({'_id':layer_id});
+
+            layer.fetch({ success : function (model, response, options) {
+                var colors = [ '#8dd3c7', '#ffffb3', '#bebada', '#fb8072', '#80b1d3', '#fdb462', '#b3de69', '#fccde5', '#d9d9d9', '#bc80bd', '#ccebc5', '#ffed6f'];
+                var current_color = _.sample(colors, 1);
+                var myStyle = {
+                    "color": current_color,
+                    "weight": 3,
+                    "opacity": 0.9
+                };
+
+
+
+                if (L_layer_group.hasLayer(layer_id)) {
+                    L_layer_group.removeLayer(layer_id);
+                    link.css({'background-color':'#fff'});
+                } else {
+                    link.css({'background-color':current_color});
+                    var myLayer = L.geoJson(response[0].features, {
+                        style: myStyle
+                    });
+                    myLayer._leaflet_id = layer_id;
+
+                    L_layer_group.addLayer(myLayer);
+
+                    map.fitBounds(myLayer.getBounds());
+                }
+            }});
+        },
+        initialize: function() {
+            this.render();
+        },
+        render: function() {
+            this.$el.html(this.template({theme: this.model.toJSON()}));
+            return this;
+        }
+    });
+
+    theme_active.fetch({ success : function (model, response, options) {
+            var t = new ThemeView({model:theme_active});
+        }
+    });
   },
 
   show: function(id){
