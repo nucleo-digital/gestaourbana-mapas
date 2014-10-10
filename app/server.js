@@ -28,7 +28,7 @@ app.set("view engine", "jade");
   "app/users/routes",
   "app/group_layers/routes",
   "app/layers/routes",
-  "app/deals/routes",
+  "app/themes/routes",
   "app/site/routes"
 ].forEach(function (routePath) {
     require(routePath)(app);

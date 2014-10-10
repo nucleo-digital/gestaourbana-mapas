@@ -15,7 +15,6 @@ block body
                         <% _.each(group.layers, function(layer) { %>
                         li
                             a.layer(data-layer-id!="<%= layer._id %>",href!="/layer/<%= layer._id %>")
-                                i.fa.fa-toggle-off
                                 | <%= layer.name %>
                         <% }); %>
             <% }); %>

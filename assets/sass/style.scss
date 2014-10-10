@@ -100,6 +100,37 @@ a {
     min-height: 300px;
     overflow-y: auto;
     overflow-x: hidden;
+
+    .accordion {
+        border:0;
+
+        .accordion-head {
+            border-bottom: 0;
+            background-color: #E8E8E8;
+            color: #666;
+            margin: 3px;
+        }
+
+        .accordion-body {
+            ul {
+                padding:0;
+                li {
+                    list-style: none;
+                    a {
+                        // white-space: nowrap;
+                        display:block;
+                        padding: 3px;
+                        border-radius: 5px;
+                        margin: 2px;
+
+                        &:hover {
+                            background-color: #eee;
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 #compartilhar {
