@@ -43,7 +43,8 @@
     "browserify": "~4.2.3",
     "dotenv": "~0.4.0",
     "mongoose-geojson-schema": "0.0.2",
-    "underscore": "~1.7.0"
+    "underscore": "~1.7.0",
+    "gulp-svgmin": "~0.4.6"
   },
   "devDependencies": {
     "mocha": "~1.18.2",
