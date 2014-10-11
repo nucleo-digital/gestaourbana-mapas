@@ -3,7 +3,7 @@
 var mongoose = require('mongoose');
 var config = require('./config');
 
-var dbUrl = process.env.MONGOHQ_URL || 'mongodb://'+config.mongodb.host+'/'+config.mongodb.database;
+var dbUrl = process.env.MONGOLAB_URI || 'mongodb://'+config.mongodb.host+'/'+config.mongodb.database;
 //var connection = mongoose.createConnection(dbUrl);
 var connection = mongoose.connect(dbUrl);
 // CONNECTION EVENTS
