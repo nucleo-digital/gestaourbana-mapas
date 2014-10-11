@@ -35,7 +35,7 @@ app.set("view engine", "jade");
 });
 
 //FINALLY, use any error handlers
-app.use(require("app/middleware").notFound);
+app.use(require("middleware").notFound);
 
 //Note that there's not much logic in this file.
 //The server should be mostly "glue" code to set things up and
