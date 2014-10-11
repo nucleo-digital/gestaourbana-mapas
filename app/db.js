@@ -1,7 +1,7 @@
 'use strict';
 
 var mongoose = require('mongoose');
-var config = require('config');
+var config = require('./config');
 
 var dbUrl = process.env.MONGOHQ_URL || 'mongodb://'+config.mongodb.host+'/'+config.mongodb.database;
 //var connection = mongoose.createConnection(dbUrl);
