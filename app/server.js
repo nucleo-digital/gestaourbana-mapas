@@ -42,7 +42,7 @@ app.use(require("./middleware").notFound);
 //then start listening
 
 
-app.listen(config.express.port, config.express.ip, function (error) {
+app.listen(config.express.port, function (error) {
   if (error) {
     log.error("Unable to listen for connections", error);
     process.exit(10);
