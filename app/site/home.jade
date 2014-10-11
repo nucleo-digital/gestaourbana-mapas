@@ -1,20 +1,19 @@
 extends ../layout
 block body
-    #map
-    .container
-        #sidebar
-            .help.alert.alert-dismissable(role="alert")
-                button.close(data-dismiss-target=".help") x
-                h4 Faça um mix com as camadas da cidade
+    .row.no-gutter
+        #sidebar.col-xs-12.col-s-3
+            button.close(data-dismiss-target="#sidebar") x
 
             .theme
             .accordion-group
-
+        #map.col-xs-12.col-s-9
         script(type="text/template", id="accordion-group-layers")
                 <% _.each(groups, function(group) { %>
                 .accordion
                     .accordion-head
-                        a(data-dropdown-target!='#<%= group._id %>', data-dropdown-parent='.accordion-group', href='#') <%= group.name %>
+                        a(data-dropdown-target!='#<%= group._id %>', data-dropdown-parent='.accordion-group', href='#')
+                            i.fa.fa-angle-down
+                            | <%= group.name + ' (' + group.layers.length + ')' %>
                     .accordion-body.dropdown-group.collapse(id!="<%= group._id %>")
                         ul
                             <% _.each(group.layers, function(layer) { %>

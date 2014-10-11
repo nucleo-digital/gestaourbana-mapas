@@ -145,6 +145,7 @@ var router = Backbone.Router.extend({
                     L_layer_group.removeLayer(layer_id);
                     link.css({'background-color':'#fff'});
                 } else {
+                    // fa fa-map-marker
                     // var baseballIcon = L.icon({
                     //     iconUrl: 'baseball-marker.png',
                     //     iconSize: [32, 37],
@@ -168,6 +169,19 @@ var router = Backbone.Router.extend({
         },
         render: function() {
             this.$el.html(this.template({theme: this.model.toJSON()}));
+            jQuery(".accordion-group").on("show.r.dropdown", function(event) {
+                var el = jQuery(event.target).find('i.fa-angle-down');
+                el.addClass('fa-angle-up');
+                el.removeClass('fa-angle-down');
+            });
+
+            jQuery(".accordion-group").on("hide.r.dropdown", function(event) {
+                console.log(event);
+                var el = jQuery(event.target).find('i.fa-angle-up');
+                el.addClass('fa-angle-down');
+                el.removeClass('fa-angle-up');
+            });
+
             return this;
         }
     });

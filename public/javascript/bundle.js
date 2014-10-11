@@ -1672,6 +1672,18 @@ jQuery('#compartilhar').sharrre({
     }
 });
 
+function adjustWorkingArea () {
+    var h_header = jQuery('.header').height();
+    var h_footer = jQuery('.footer').height();
+    var h_window = jQuery(window).height();
+    var padding = 10;
+    ['#sidebar', '#map'].forEach(function (panels) {
+        jQuery(panels).css({'height': h_window - h_footer - h_header - padding});
+    });
+}
+adjustWorkingArea();
+jQuery(window).on('resize', adjustWorkingArea);
+
 var Router = require('./router');
 
 var App = {
@@ -1832,6 +1844,7 @@ var router = Backbone.Router.extend({
                     L_layer_group.removeLayer(layer_id);
                     link.css({'background-color':'#fff'});
                 } else {
+                    // fa fa-map-marker
                     // var baseballIcon = L.icon({
                     //     iconUrl: 'baseball-marker.png',
                     //     iconSize: [32, 37],
@@ -1855,6 +1868,19 @@ var router = Backbone.Router.extend({
         },
         render: function() {
             this.$el.html(this.template({theme: this.model.toJSON()}));
+            jQuery(".accordion-group").on("show.r.dropdown", function(event) {
+                var el = jQuery(event.target).find('i.fa-angle-down');
+                el.addClass('fa-angle-up');
+                el.removeClass('fa-angle-down');
+            });
+
+            jQuery(".accordion-group").on("hide.r.dropdown", function(event) {
+                console.log(event);
+                var el = jQuery(event.target).find('i.fa-angle-up');
+                el.addClass('fa-angle-down');
+                el.removeClass('fa-angle-up');
+            });
+
             return this;
         }
     });

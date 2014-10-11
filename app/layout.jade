@@ -29,7 +29,7 @@ html
         link(href='/stylesheets/style.css', rel='stylesheet')
     body
         .header
-            .top-bar.row.container
+            .top-bar.row.container.hidden-xs
                 .col-xs-12.col-s-4
                     ul.no-bullets.menu
                         li
@@ -41,17 +41,20 @@ html
                         li
                             a(href="/como-usar") Como Usar
 
-                #compartilhar.col-xs-12.col-s-4.offset-s-4(data-url="http://gestaourbana.prefeitura.sp.gov.br/funcao-social/",data-text="Sabe de alum imóvel ocioso? Colabore com este projeto inovador da Prefeitura de São Paulo.", data-image="/funcao-social/images/social.png")
+                #compartilhar.col-xs-12.col-s-4.offset-s-4(data-url="http://mapas.gestaourbana.prefeitura.sp.gov.br/",data-text="Compartilhe o mapa.", data-image="/images/social.png")
             h1
                 a(href="/")
                     img(src="/images/logo-gestaourbana-mapas.svg", alt="Gestão Urbana Mapas")
+
+            .theme-bar
+                p.name Parklets
 
         block body
 
         .footer
             .container
                 .row.no-gutter
-                    .licenca.col-xs-12.col-s-6
+                    .licenca.col-xs-12.col-s-6.hidden-xs
                         p.inline-block
                             i.fa.fa-unlock
                             |  Código-fonte sob licença
