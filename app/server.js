@@ -25,11 +25,11 @@ app.set("view engine", "jade");
 //See the README about ordering of middleware
 //Load the routes ("controllers" -ish)
 [
-  "app/users/routes",
-  "app/group_layers/routes",
-  "app/layers/routes",
-  "app/themes/routes",
-  "app/site/routes"
+  "./users/routes",
+  "./group_layers/routes",
+  "./layers/routes",
+  "./themes/routes",
+  "./site/routes"
 ].forEach(function (routePath) {
     require(routePath)(app);
 });
