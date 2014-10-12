@@ -77,13 +77,17 @@ var router = Backbone.Router.extend({
                 if (L_layer_group.hasLayer(layer_id)) {
                     L_layer_group.removeLayer(layer_id);
 
-                    el_icon.toggleClass('fa-square-o');
-                    el_icon.toggleClass('fa-square');
-                    link.css({'color':'#666'});
+                    // el_icon.toggleClass('fa-square-o');
+                    // el_icon.toggleClass('fa-square');
+                    link.css({'border-color':'#eee'});
+                    link.css({'background-color':'#fff'});
+                    link.toggleClass('active');
                 } else {
-                    link.css({'color':current_color});
-                    el_icon.toggleClass('fa-square-o');
-                    el_icon.toggleClass('fa-square');
+                    link.css({'border-color':current_color});
+                    // el_icon.toggleClass('fa-square-o');
+                    // el_icon.toggleClass('fa-square');
+                    link.css({'background-color':current_color});
+                    link.toggleClass('active');
 
                     var myLayer = L.geoJson(response[0].features, {
                         style: myStyle
@@ -122,6 +126,21 @@ var router = Backbone.Router.extend({
 
     var theme_active = new Theme();
 
+    var toggleIconAccordion = function () {
+        jQuery(".accordion-group").on("show.r.dropdown", function(event) {
+            var el = jQuery(event.target).find('i.fa-angle-down');
+            el.addClass('fa-angle-up');
+            el.removeClass('fa-angle-down');
+        });
+
+        jQuery(".accordion-group").on("hide.r.dropdown", function(event) {
+            console.log(event);
+            var el = jQuery(event.target).find('i.fa-angle-up');
+            el.addClass('fa-angle-down');
+            el.removeClass('fa-angle-up');
+        });
+    };
+
     var ThemeView = Backbone.View.extend({
         tagName: 'div',
         el: '.theme',
@@ -150,6 +169,7 @@ var router = Backbone.Router.extend({
                 if (L_layer_group.hasLayer(layer_id)) {
                     L_layer_group.removeLayer(layer_id);
                     link.css({'background-color':'#fff'});
+                    link.parent().toggleClass('active');
                 } else {
                     // fa fa-map-marker
                     // var baseballIcon = L.icon({
@@ -159,6 +179,7 @@ var router = Backbone.Router.extend({
                     //     popupAnchor: [0, -28]
                     // });
                     link.css({'background-color':current_color});
+
                     var myLayer = L.geoJson(response[0].features, {
                         style: myStyle
                     });
@@ -175,18 +196,8 @@ var router = Backbone.Router.extend({
         },
         render: function() {
             this.$el.html(this.template({theme: this.model.toJSON()}));
-            jQuery(".accordion-group").on("show.r.dropdown", function(event) {
-                var el = jQuery(event.target).find('i.fa-angle-down');
-                el.addClass('fa-angle-up');
-                el.removeClass('fa-angle-down');
-            });
 
-            jQuery(".accordion-group").on("hide.r.dropdown", function(event) {
-                console.log(event);
-                var el = jQuery(event.target).find('i.fa-angle-up');
-                el.addClass('fa-angle-down');
-                el.removeClass('fa-angle-up');
-            });
+            toggleIconAccordion();
 
             return this;
         }

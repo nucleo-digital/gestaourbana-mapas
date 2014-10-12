@@ -17,7 +17,7 @@ block body
                         <% _.each(group.layers, function(layer) { %>
                         li
                             a.layer(data-layer-id!="<%= layer._id %>",href!="/layer/<%= layer._id %>")
-                                i.fa.fa-square-o
+                                //- i.fa.fa-square-o
                                 | <%= layer.name.replace(/\_/gi, ' ') %>
                         <% }); %>
             <% }); %>

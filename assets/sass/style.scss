@@ -118,29 +118,35 @@ ul {
             background-color: #E8E8E8;
             color: #666;
             margin: 0;
-            padding: 0 10px;
+            padding: 0 15px;
 
-            i {
-                float: right;
-                margin: 3px 0 0;
+            a {
+                padding: 5px 0;
+
+                i {
+                    float: right;
+                    margin: 3px 0 0;
+                }
             }
         }
 
         .accordion-body {
-            padding: 0;
+            padding: 0 ;
 
             ul li a {
                 i {
-                    margin: 0 10px;
+                    margin: 0 10px 0 0;
                     font-size: 20px;
                 }
+                text-decoration: none;
                 display:block;
-                padding: 5px 10px;
+                border-left: 5px solid #eee;
+                padding: 5px 0 5px 10px;
                 margin: 0;
-                white-space: nowrap;
-                border-bottom: 1px solid #fff;
+                // white-space: nowrap;
+                border-bottom: 1px solid #eee;
                 &:hover {
-                    background-color: #eee;
+                    background-color: #fcfcfc;
                 }
             }
         }
