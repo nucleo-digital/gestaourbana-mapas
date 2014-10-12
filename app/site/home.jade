@@ -30,3 +30,15 @@ block body
                 a.layer(data-layer-id!="<%= layer._id %>",href!="/layer/<%= layer._id %>")
                 | <%= layer.name %>
             <% }); %>
+
+    script(type="text/template", id="feature-popup")
+        .marker-map
+            strong Informações Extra
+            hr
+            ul
+                <% _.each(feature.properties, function(v,k) { %>
+                li
+                    //- a.layer(data-layer-id!="<%= layer._id %>",href!="/layer/<%= layer._id %>")
+                    strong <%= k %>
+                    | : <%= v %>
+                <% }); %>

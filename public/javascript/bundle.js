@@ -1807,7 +1807,8 @@ var router = Backbone.Router.extend({
                     link.toggleClass('active');
 
                     var myLayer = L.geoJson(response[0].features, {
-                        style: myStyle
+                        style: myStyle,
+                        onEachFeature: onEachFeature
                     });
                     myLayer._leaflet_id = layer_id;
 
@@ -1858,6 +1859,14 @@ var router = Backbone.Router.extend({
         });
     };
 
+    var onEachFeature = function (feature, layer) {
+        // does this feature have a property named popupContent?
+        if (feature.properties) {
+            var featurePopup = _.template(jQuery('#feature-popup').html());
+            layer.bindPopup(featurePopup({'feature':feature}));
+        }
+    }
+
     var ThemeView = Backbone.View.extend({
         tagName: 'div',
         el: '.theme',
@@ -1898,7 +1907,8 @@ var router = Backbone.Router.extend({
                     link.css({'background-color':current_color});
 
                     var myLayer = L.geoJson(response[0].features, {
-                        style: myStyle
+                        style: myStyle,
+                        onEachFeature: onEachFeature
                     });
                     myLayer._leaflet_id = layer_id;
 
