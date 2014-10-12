@@ -43,12 +43,30 @@ function adjustWorkingArea () {
     var h_footer = jQuery('.footer').height();
     var h_window = jQuery(window).height();
     var padding = 10;
-    ['#sidebar', '#map'].forEach(function (panels) {
+    ['#map'].forEach(function (panels) {
         jQuery(panels).css({'height': h_window - h_footer - h_header - padding});
     });
 }
 adjustWorkingArea();
 jQuery(window).on('resize', adjustWorkingArea);
+
+jQuery('.mobile-sidebar').on('click', function (evt) {
+    var el = jQuery('#sidebar');
+    // console.log(el.is(":visible"));
+    if (el.hasClass('desativado')) {
+        el.addClass('animated fadeInLeft');
+        jQuery('#sidebar').one('webkitAnimationEnd mozAnimationEnd MSAnimationEnd oanimationend animationend', function () {
+            // el.addClass('desativado');
+            el.removeClass('animated fadeInLeft desativado');
+        });
+    } else {
+        el.addClass('animated fadeOutLeft');
+        jQuery('#sidebar').one('webkitAnimationEnd mozAnimationEnd MSAnimationEnd oanimationend animationend', function () {
+            el.addClass('desativado');
+            el.removeClass('animated fadeOutLeft');
+        });
+    }
+});
 
 var Router = require('./router');
 

@@ -1,34 +1,32 @@
 extends ../layout
 block body
     .row.no-gutter
-        #sidebar.col-xs-12.col-s-3
-            button.close(data-dismiss-target="#sidebar") x
-
+        #sidebar.col-xs-9.col-s-3.desativado
             .theme
             .accordion-group
         #map.col-xs-12.col-s-9
-        script(type="text/template", id="accordion-group-layers")
-                <% _.each(groups, function(group) { %>
-                .accordion
-                    .accordion-head
-                        a(data-dropdown-target!='#<%= group._id %>', data-dropdown-parent='.accordion-group', href='#')
-                            | <%= group.name + ' (' + group.layers.length + ')' %>
-                            i.fa.fa-angle-down
-                    .accordion-body.dropdown-group.collapse(id!="<%= group._id %>")
-                        ul
-                            <% _.each(group.layers, function(layer) { %>
-                            li
-                                a.layer(data-layer-id!="<%= layer._id %>",href!="/layer/<%= layer._id %>")
-                                    i.fa.fa-square-o
-                                    | <%= layer.name.replace(/\_/gi, ' ') %>
-                            <% }); %>
-                <% }); %>
+    script(type="text/template", id="accordion-group-layers")
+            <% _.each(groups, function(group) { %>
+            .accordion
+                .accordion-head
+                    a(data-dropdown-target!='#<%= group._id %>', data-dropdown-parent='.accordion-group', href='#')
+                        | <%= group.name + ' (' + group.layers.length + ')' %>
+                        i.fa.fa-angle-down
+                .accordion-body.dropdown-group.collapse(id!="<%= group._id %>")
+                    ul
+                        <% _.each(group.layers, function(layer) { %>
+                        li
+                            a.layer(data-layer-id!="<%= layer._id %>",href!="/layer/<%= layer._id %>")
+                                i.fa.fa-square-o
+                                | <%= layer.name.replace(/\_/gi, ' ') %>
+                        <% }); %>
+            <% }); %>
 
-        script(type="text/template", id="theme-active")
-            h3 <%= theme.name %>
-            ul
-                <% _.each(theme.layers, function(layer) { %>
-                li
-                    a.layer(data-layer-id!="<%= layer._id %>",href!="/layer/<%= layer._id %>")
-                    | <%= layer.name %>
-                <% }); %>
+    script(type="text/template", id="theme-active")
+        h3 <%= theme.name %>
+        ul
+            <% _.each(theme.layers, function(layer) { %>
+            li
+                a.layer(data-layer-id!="<%= layer._id %>",href!="/layer/<%= layer._id %>")
+                | <%= layer.name %>
+            <% }); %>

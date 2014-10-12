@@ -1,6 +1,7 @@
 @import "responsive";
 @import "leaflet";
 @import "../bower_components/Font-Awesome/scss/font-awesome.scss";
+@import "animate";
 @import "fonts";
 
 $parklet_color: #C14292;
@@ -95,6 +96,7 @@ ul {
     height: 540px;
 }
 
+
 #sidebar {
     background-color: #fff;
     box-shadow: 3px 3px 3px 0 rgba(153,153,153,.75);
@@ -108,6 +110,7 @@ ul {
     }
 
     .accordion {
+        min-width: 200px;
         border:0;
 
         .accordion-head {
@@ -139,6 +142,33 @@ ul {
                 &:hover {
                     background-color: #eee;
                 }
+            }
+        }
+    }
+}
+@media print and (max-width: 536px), screen and (max-width: 47.99em) {
+    #sidebar {
+        // height:0;
+        // display: none;
+    }
+    .desativado {
+        transform: translate3d(-100%, 0, 0);
+    }
+    #map {
+        position: absolute;
+        top: 110px;
+        z-index: -999;
+    }
+    .theme-bar {
+        .name {
+            display: inline-block;
+        }
+        .mobile-sidebar {
+            color: #fff;
+            margin: 0 10px;
+            display: inline-block !important;
+            i {
+                font-size: 20px;
             }
         }
     }
