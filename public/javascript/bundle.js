@@ -1649,6 +1649,25 @@ window.Backbone.$ = jQuery;
 
 var Sharrre = require('../bower_components/Sharrre/jquery.sharrre.min');
 
+
+// // Patch Model and Collection.
+// _.each(["Model", "Collection"], function(name) {
+//   // Cache Backbone constructor.
+//   var ctor = Backbone[name];
+//   // Cache original fetch.
+//   var fetch = ctor.prototype.fetch;
+
+//   // Override the fetch method to emit a fetch event.
+//   ctor.prototype.fetch = function() {
+//     // Trigger the fetch event on the instance.
+//     this.trigger("fetch", this);
+
+//     // Pass through to original fetch.
+//     return fetch.apply(this, arguments);
+//   };
+// });
+
+
 jQuery('#compartilhar').sharrre({
     share: {
         twitter: true,
@@ -1780,6 +1799,7 @@ var router = Backbone.Router.extend({
             var layer_id = link.data('layer-id');
             var layer = new Layer({'_id':layer_id});
 
+            link.prepend('<i class="fa fa-circle-o-notch fa-spin"></i>');
             layer.fetch({ success : function (model, response, options) {
                 var colors = [ '#8dd3c7', '#ffffb3', '#bebada', '#fb8072', '#80b1d3', '#fdb462', '#b3de69', '#fccde5', '#d9d9d9', '#bc80bd', '#ccebc5', '#ffed6f'];
                 var current_color = _.sample(colors, 1);
@@ -1816,6 +1836,8 @@ var router = Backbone.Router.extend({
 
                     map.fitBounds(myLayer.getBounds());
                 }
+
+                link.find('i').remove();
             }});
         },
         initialize: function() {
