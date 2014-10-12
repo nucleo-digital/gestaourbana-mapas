@@ -82,7 +82,7 @@ ul {
 
 .theme-bar {
     background-color: $parklet_color;
-    padding: 3px 0;
+    padding: 5px 0;
 
     .name {
         text-align: center;
@@ -150,9 +150,11 @@ ul {
     #sidebar {
         // height:0;
         // display: none;
+        position: absolute;
     }
     .desativado {
         transform: translate3d(-100%, 0, 0);
+        // display: none;
     }
     #map {
         position: absolute;
@@ -169,6 +171,7 @@ ul {
             display: inline-block !important;
             i {
                 font-size: 20px;
+                margin: 0 10px;
             }
         }
     }
