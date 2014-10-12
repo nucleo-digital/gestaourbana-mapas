@@ -1677,7 +1677,7 @@ function adjustWorkingArea () {
     var h_footer = jQuery('.footer').height();
     var h_window = jQuery(window).height();
     var padding = 10;
-    ['#map'].forEach(function (panels) {
+    ['#sidebar', '#map'].forEach(function (panels) {
         jQuery(panels).css({'height': h_window - h_footer - h_header - padding});
     });
 }

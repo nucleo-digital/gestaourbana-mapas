@@ -29,7 +29,7 @@ html
         link(href='/stylesheets/style.css', rel='stylesheet')
     body
         .header
-            .top-bar.row.container.hidden-xs
+            .top-bar.row.hidden-xs
                 .col-xs-12.col-s-4
                     ul.no-bullets.menu
                         li
@@ -55,23 +55,22 @@ html
         block body
 
         .footer
-            .container
-                .row.no-gutter
-                    .licenca.col-xs-12.col-s-6.hidden-xs
-                        p.inline-block
-                            i.fa.fa-unlock
-                            |  Código-fonte sob licença
-                            a(href="www.gnu.org/licenses/gpl.txt")  GPL v3
-                        p.inline-block
-                            i.fa.fa-cc
-                            |  Conteúdo sob licença
-                            a(href="http://creativecommons.org/licenses/by/3.0/deed.pt_BR")  CC BY 3.0
-                    .realizacao.col-xs-6.col-s-3
-                        p.inline-block Realizacao
-                        img(src="/images/logo-smdu.png", alt="Logo da Prefeitura de São Paulo Desenvolvimento Urbano")
-                    .apoio.col-xs-6.col-s-3
-                        p.inline-block Apoio
-                        img(src="/images/logo-sp-urbanismo.svg", alt="Logo da SP Urbanismo")
+            .row.no-gutter
+                .licenca.col-xs-12.col-s-6.hidden-xs
+                    p.inline-block
+                        i.fa.fa-unlock
+                        |  Código-fonte sob licença
+                        a(href="www.gnu.org/licenses/gpl.txt")  GPL v3
+                    p.inline-block
+                        i.fa.fa-cc
+                        |  Conteúdo sob licença
+                        a(href="http://creativecommons.org/licenses/by/3.0/deed.pt_BR")  CC BY 3.0
+                .realizacao.col-xs-6.col-s-3
+                    p.inline-block Realizacao
+                    img(src="/images/logo-smdu.png", alt="Logo da Prefeitura de São Paulo Desenvolvimento Urbano")
+                .apoio.col-xs-6.col-s-3
+                    p.inline-block Apoio
+                    img(src="/images/logo-sp-urbanismo.svg", alt="Logo da SP Urbanismo")
 
         <!--[if IE 8]>
         script(src='javascript/vendor/jquery-1.11.1.min.js')
