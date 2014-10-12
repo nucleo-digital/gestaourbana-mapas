@@ -2,7 +2,15 @@ var LayerModel = require('../layers/LayerModel');
 var GroupLayer = require('./GroupLayerModel');
 
 function getGroups(req, res) {
-    GroupLayer.find({}).populate('layers', 'name').exec(function(err, results) {
+    var opts = {
+        path: 'layers',
+        select: 'name'
+        //  features.features.geometry.type
+        // options: {
+        //     limit: 1
+        // }
+    };
+    GroupLayer.find({}).populate(opts).exec(function(err, results) {
         res.json(results);
     })
 }

@@ -12,14 +12,15 @@ block body
                 .accordion
                     .accordion-head
                         a(data-dropdown-target!='#<%= group._id %>', data-dropdown-parent='.accordion-group', href='#')
-                            i.fa.fa-angle-down
                             | <%= group.name + ' (' + group.layers.length + ')' %>
+                            i.fa.fa-angle-down
                     .accordion-body.dropdown-group.collapse(id!="<%= group._id %>")
                         ul
                             <% _.each(group.layers, function(layer) { %>
                             li
                                 a.layer(data-layer-id!="<%= layer._id %>",href!="/layer/<%= layer._id %>")
-                                    | <%= layer.name %>
+                                    i.fa.fa-square-o
+                                    | <%= layer.name.replace(/\_/gi, ' ') %>
                             <% }); %>
                 <% }); %>
 
@@ -29,5 +30,5 @@ block body
                 <% _.each(theme.layers, function(layer) { %>
                 li
                     a.layer(data-layer-id!="<%= layer._id %>",href!="/layer/<%= layer._id %>")
-                        | <%= layer.name %>
+                    | <%= layer.name %>
                 <% }); %>

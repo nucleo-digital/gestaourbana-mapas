@@ -1,7 +1,7 @@
 var _ = require('underscore');
 var L = require('../bower_components/leaflet/dist/leaflet');
 
-var map = L.map('map').setView([-23.445080344117105, -46.78013442158101], 13);
+var map = L.map('map').setView([-23.55, -46.633333], 13);
 L.Icon.Default.imagePath = '/images/leaflet';
 // add an OpenStreetMap tile layer
 L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', {
@@ -69,16 +69,22 @@ var router = Backbone.Router.extend({
                 var myStyle = {
                     "color": current_color,
                     "weight": 3,
-                    "opacity": 0.9
+                    "opacity": 1
                 };
 
-
+                var el_icon = link.find('i');
 
                 if (L_layer_group.hasLayer(layer_id)) {
                     L_layer_group.removeLayer(layer_id);
-                    link.css({'background-color':''});
+
+                    el_icon.toggleClass('fa-square-o');
+                    el_icon.toggleClass('fa-square');
+                    link.css({'color':'#666'});
                 } else {
-                    link.css({'background-color':current_color});
+                    link.css({'color':current_color});
+                    el_icon.toggleClass('fa-square-o');
+                    el_icon.toggleClass('fa-square');
+
                     var myLayer = L.geoJson(response[0].features, {
                         style: myStyle
                     });
