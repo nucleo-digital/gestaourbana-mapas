@@ -1829,7 +1829,17 @@ var router = Backbone.Router.extend({
 
                     var myLayer = L.geoJson(response[0].features, {
                         style: myStyle,
-                        onEachFeature: onEachFeature
+                        onEachFeature: onEachFeature,
+                        filter: function(feature, layer) {
+                            if ( (feature.geometry.coordinates[0] == 0) &&
+                                 (feature.geometry.coordinates[1] == 0) ) {
+                                return false;
+                            } else {
+                                return true;
+                            }
+
+                            // return feature.properties.show_on_map;
+                        }
                     });
                     myLayer._leaflet_id = layer_id;
 
@@ -1875,7 +1885,6 @@ var router = Backbone.Router.extend({
         });
 
         jQuery(".accordion-group").on("hide.r.dropdown", function(event) {
-            console.log(event);
             var el = jQuery(event.target).find('i.fa-angle-up');
             el.addClass('fa-angle-down');
             el.removeClass('fa-angle-up');
@@ -1942,8 +1951,9 @@ var router = Backbone.Router.extend({
                         style: model.myStyle,
                         pointToLayer: function ( featureData, latlng ) {
                             var myIcon = L.divIcon({className: 'icon-theme fa fa-map-marker fa-3x L_'+model.id});
-                            return L.marker(latlng, {icon: myIcon});
-                            // L.circleMarker(latlng, geojsonMarkerOptions);
+                            return L.marker(latlng, {icon: myIcon}).on('click', function (e) {
+                                console.log(featureData);
+                            });;
                         }
                     });
                     myLayer._leaflet_id = model.id;

@@ -35,7 +35,8 @@ ul {
 }
 
 .icon-theme {
-    text-shadow: 3px 3px 3px rgba(0,0,0,.75);
+    // text-shadow: 3px 3px 3px rgba(0,0,0,.75);
+    text-shadow: -1px 0 #fff, 0 1px #fff, 1px 0 #fff, 0 -1px #fff;
     height: 36px;
     width: 36px;
 }
@@ -137,7 +138,7 @@ ul {
         }
 
         ul li a {
-            // border: 0;
+            border-bottom: 0;
             padding-left: 15px;
             i {
                 float: right;
