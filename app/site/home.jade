@@ -23,13 +23,16 @@ block body
             <% }); %>
 
     script(type="text/template", id="theme-active")
-        h3 <%= theme.name %>
+        // <%= theme.name %>
         ul
             <% _.each(theme.layers, function(layer) { %>
             li
                 a.layer(data-layer-id!="<%= layer._id %>",href!="/layer/<%= layer._id %>")
-                | <%= layer.name %>
+                    | <%= layer.name %>
+                    i.fa.fa-search
             <% }); %>
+
+        h3 Camadas Relacionadas
 
     script(type="text/template", id="feature-popup")
         .marker-map

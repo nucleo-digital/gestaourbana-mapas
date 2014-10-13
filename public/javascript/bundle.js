@@ -1745,6 +1745,7 @@ L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', {
 }).addTo(map);
 
 var L_layer_group = L.layerGroup().addTo(map);
+var L_layer_theme = L.featureGroup().addTo(map);
 
 var Backbone = window.Backbone;
 
@@ -1894,57 +1895,63 @@ var router = Backbone.Router.extend({
         el: '.theme',
         template:  _.template( jQuery('#theme-active').html()),
         events: {
-            'click a.layer': "loadLayer"
+            'click a.layer': "zoom"
         },
-        loadLayer : function (e) {
+        zoom : function (e) {
             e.preventDefault();
             var link = jQuery(e.currentTarget);
 
             var layer_id = link.data('layer-id');
-            var layer = new Layer({'_id':layer_id});
+            var myLayer = L_layer_theme.getLayer(layer_id);
+            map.fitBounds(myLayer.getBounds());
+        },
+        initialize: function() {
+            // this.listenTo(this.model, "change", this.render);
+            this.render();
+        },
+        render: function() {
+            this.$el.html(this.template({theme: this.model.toJSON()}));
+            var layer_themes = [];
+            var colors = [ '#4daf4a', '#377eb8', '#e41a1c'];
 
-            layer.fetch({ success : function (model, response, options) {
-                var colors = [ '#8dd3c7', '#ffffb3', '#bebada', '#fb8072', '#80b1d3', '#fdb462', '#b3de69', '#fccde5', '#d9d9d9', '#bc80bd', '#ccebc5', '#ffed6f'];
-                var current_color = _.sample(colors, 1);
+            jQuery('.theme').find('.layer').each(function (k,v) {
+                var link = jQuery(v);
+                var layer_id = link.data('layer-id');
+
+                var current_color = colors[k];
                 var myStyle = {
                     "color": current_color,
                     "weight": 3,
                     "opacity": 0.9
                 };
+                $("<style type='text/css'> .L_"+layer_id+" { color: "+current_color+"; } </style>").appendTo("head");
+                link.css({'border-color':current_color});
+                // el_icon.toggleClass('fa-square-o');
+                // el_icon.toggleClass('fa-square');
+                // link.css({'background-color':current_color});
 
+                var layer = new Layer({'_id':layer_id});
+                // layer.set('color', current_color);
+                layer.set('myStyle', myStyle);
+                layer_themes.push(layer);
+            });
 
-
-                if (L_layer_group.hasLayer(layer_id)) {
-                    L_layer_group.removeLayer(layer_id);
-                    link.css({'background-color':'#fff'});
-                    link.parent().toggleClass('active');
-                } else {
-                    // fa fa-map-marker
-                    // var baseballIcon = L.icon({
-                    //     iconUrl: 'baseball-marker.png',
-                    //     iconSize: [32, 37],
-                    //     iconAnchor: [16, 37],
-                    //     popupAnchor: [0, -28]
-                    // });
-                    link.css({'background-color':current_color});
-
+            _.each(layer_themes, function(v, k) {
+                v.fetch({ success : function (model, response, options) {
                     var myLayer = L.geoJson(response[0].features, {
-                        style: myStyle,
-                        onEachFeature: onEachFeature
+                        style: model.myStyle,
+                        pointToLayer: function ( featureData, latlng ) {
+                            var myIcon = L.divIcon({className: 'icon-theme fa fa-map-marker fa-3x L_'+model.id});
+                            return L.marker(latlng, {icon: myIcon});
+                            // L.circleMarker(latlng, geojsonMarkerOptions);
+                        }
                     });
-                    myLayer._leaflet_id = layer_id;
+                    myLayer._leaflet_id = model.id;
 
-                    L_layer_group.addLayer(myLayer);
-
-                    map.fitBounds(myLayer.getBounds());
-                }
-            }});
-        },
-        initialize: function() {
-            this.render();
-        },
-        render: function() {
-            this.$el.html(this.template({theme: this.model.toJSON()}));
+                    L_layer_theme.addLayer(myLayer);
+                    map.fitBounds(L_layer_theme.getBounds());
+                }});
+            });
 
             toggleIconAccordion();
 
@@ -1952,10 +1959,21 @@ var router = Backbone.Router.extend({
         }
     });
 
+    theme_active.on('change', function(model) {
+        // console.log($('#sidebar').html(), model);
+        // $('#theme').find('.layer').trigger('click');
+
+    });
+
     theme_active.fetch({ success : function (model, response, options) {
             var t = new ThemeView({model:theme_active});
+            // t.on('change', function(model) {
+            //     console.log($('#theme').html());
+            //     $('#theme').find('.layer').trigger('click');
+            // });
         }
     });
+
   },
 
   show: function(id){

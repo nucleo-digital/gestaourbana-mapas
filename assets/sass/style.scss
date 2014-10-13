@@ -33,6 +33,12 @@ ul {
         list-style: none;
     }
 }
+
+.icon-theme {
+    text-shadow: 3px 3px 3px rgba(0,0,0,.75);
+    height: 36px;
+    width: 36px;
+}
 #compartilhar {
     min-height: 30px;
     padding: 10px 0 0;
@@ -104,9 +110,47 @@ ul {
     overflow-y: auto;
     overflow-x: hidden;
 
+    ul li a {
+        i {
+            margin: 0 10px 0 0;
+            font-size: 20px;
+        }
+        text-decoration: none;
+        display:block;
+        border-left: 5px solid #eee;
+        padding: 8px 0 8px 10px;
+        margin: 0;
+        // white-space: nowrap;
+        border-bottom: 1px solid #eee;
+        &:hover {
+            background-color: #fcfcfc;
+        }
+    }
     .theme {
         box-shadow: 0px 3px 3px 0 rgba(153,153,153,.75);
-        padding: 15px;
+        padding: 0;
+
+        h3 {
+            font-weight: normal;
+            padding: 8px 0 8px 15px;
+            color: #666;
+        }
+
+        ul li a {
+            // border: 0;
+            padding-left: 15px;
+            i {
+                float: right;
+                margin: 0 15px 0 0;
+                display: none;
+            }
+
+            &:hover {
+                i {
+                    display: block;
+                }
+            }
+        }
     }
 
     .accordion {
@@ -133,24 +177,11 @@ ul {
         .accordion-body {
             padding: 0 ;
 
-            ul li a {
-                i {
-                    margin: 0 10px 0 0;
-                    font-size: 20px;
-                }
-                text-decoration: none;
-                display:block;
-                border-left: 5px solid #eee;
-                padding: 5px 0 5px 10px;
-                margin: 0;
-                // white-space: nowrap;
-                border-bottom: 1px solid #eee;
-                &:hover {
-                    background-color: #fcfcfc;
-                }
-            }
+
         }
     }
+
+
 }
 @media print and (max-width: 536px), screen and (max-width: 47.99em) {
     #sidebar {
@@ -177,7 +208,7 @@ ul {
             display: inline-block !important;
             i {
                 font-size: 20px;
-                margin: 0 5px;
+                margin: 0 0 0 5px;
             }
         }
     }
