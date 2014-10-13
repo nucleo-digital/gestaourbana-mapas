@@ -36,6 +36,10 @@ module.exports = function (map) {
             var layer_id = link.data('layer-id');
             var myLayer = L_layer_theme.getLayer(layer_id);
             map.fitBounds(myLayer.getBounds());
+
+            if ($.support.currentGrid().grid == 'xs') {
+                jQuery('.mobile-sidebar').trigger('click');
+            }
         },
         initialize: function() {
             // this.listenTo(this.model, "change", this.render);

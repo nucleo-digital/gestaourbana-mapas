@@ -1617,7 +1617,7 @@
 
 }));
 
-},{"underscore":13}],3:[function(require,module,exports){
+},{"underscore":15}],3:[function(require,module,exports){
 /*
  Leaflet, a JavaScript library for mobile-friendly interactive maps. http://leafletjs.com
  (c) 2010-2013, Vladimir Agafonkin
@@ -1680,6 +1680,7 @@ jQuery(window).on('resize', adjustWorkingArea);
 
 // enable menu transition on mobile format
 jQuery('.mobile-sidebar').on('click', function (evt) {
+    evt.preventDefault();
     var el = jQuery('#sidebar');
 
     if (el.hasClass('desativado')) {
@@ -1708,13 +1709,14 @@ window.App = App;
 
 App.GroupLayerView = require('./view/GroupLayer')(map);
 App.ThemeView = require('./view/Theme')(map);
+App.PoiView = require('./view/Poi')();
 
 var Router = require('./router');
 
 App.Router = new Router;
 Backbone.history.start();
 
-},{"../bower_components/Sharrre/jquery.sharrre.min":1,"../bower_components/backbone/backbone":2,"../bower_components/leaflet/dist/leaflet":3,"../bower_components/responsive/build/responsive.min":4,"./router":10,"./view/GroupLayer":11,"./view/Theme":12}],6:[function(require,module,exports){
+},{"../bower_components/Sharrre/jquery.sharrre.min":1,"../bower_components/backbone/backbone":2,"../bower_components/leaflet/dist/leaflet":3,"../bower_components/responsive/build/responsive.min":4,"./router":11,"./view/GroupLayer":12,"./view/Poi":13,"./view/Theme":14}],6:[function(require,module,exports){
 var Backbone = window.Backbone;
 var LayerModel = require('../model/Layer');
 
@@ -1751,6 +1753,19 @@ module.exports = Backbone.Model.extend({
 });
 },{}],9:[function(require,module,exports){
 var Backbone = window.Backbone;
+
+module.exports = Backbone.Model.extend({
+    attributes : {
+        'name': 'Empty Poi',
+        'features': {},
+        'created_at': Date.now
+    },
+    idAttribute: "_id",
+    urlRoot: '/poi'
+});
+
+},{}],10:[function(require,module,exports){
+var Backbone = window.Backbone;
 var LayerCollection = require('../collection/Layer');
 
 module.exports = Backbone.Model.extend({
@@ -1763,7 +1778,7 @@ module.exports = Backbone.Model.extend({
         url: '/themes/active'
     });
 
-},{"../collection/Layer":6}],10:[function(require,module,exports){
+},{"../collection/Layer":6}],11:[function(require,module,exports){
 var App = window.App || {};
 
 var _ = require('underscore');
@@ -1772,6 +1787,7 @@ var L = require('../bower_components/leaflet/dist/leaflet');
 var LayerModel = require('./model/Layer');
 var ThemeModel = require('./model/Theme');
 var GroupLayerModel = require('./model/GroupLayer');
+var PoiModel = require('./model/Poi');
 
 var Router = Backbone.Router.extend({
     routes: {
@@ -1807,9 +1823,12 @@ var Router = Backbone.Router.extend({
     },
 
     show: function(id) {
-        // $(document.body).append("Show route has been called.. with id equals : " + id);
-
-        console.log("Router: "+ id);
+        var poi = new PoiModel({'_id':id});
+        poi.fetch({success:function(model, response, options) {
+            var g = new App.PoiView({
+                model:poi
+            });
+        }});
     },
 
     download: function(random) {
@@ -1830,7 +1849,7 @@ var Router = Backbone.Router.extend({
 
 module.exports = Router;
 
-},{"../bower_components/leaflet/dist/leaflet":3,"./model/GroupLayer":7,"./model/Layer":8,"./model/Theme":9,"underscore":13}],11:[function(require,module,exports){
+},{"../bower_components/leaflet/dist/leaflet":3,"./model/GroupLayer":7,"./model/Layer":8,"./model/Poi":9,"./model/Theme":10,"underscore":15}],12:[function(require,module,exports){
 var _ = require('underscore');
 var Backbone = window.Backbone;
 var LayerModel = require('../model/Layer');
@@ -1908,7 +1927,9 @@ module.exports = function (map) {
 
                     map.fitBounds(myLayer.getBounds());
                 }
-
+                if ($.support.currentGrid().grid == 'xs') {
+                    jQuery('.mobile-sidebar').trigger('click');
+                }
                 link.find('i').remove();
             }});
         },
@@ -1924,7 +1945,46 @@ module.exports = function (map) {
     return GroupLayerView;
 }
 
-},{"../../bower_components/leaflet/dist/leaflet":3,"../model/Layer":8,"underscore":13}],12:[function(require,module,exports){
+},{"../../bower_components/leaflet/dist/leaflet":3,"../model/Layer":8,"underscore":15}],13:[function(require,module,exports){
+var App = window.App || {};
+var Backbone = window.Backbone;
+var _ = require('underscore');
+
+module.exports = function () {
+
+    var PoiView = Backbone.View.extend({
+        tagName: 'div',
+        el: '.ponto-de-interesse',
+        template:  _.template( jQuery('#ponto-de-interesse-info').html()),
+        events: {
+            'click a.layer': "zoom"
+        },
+        zoom : function (e) {
+            e.preventDefault();
+            var link = jQuery(e.currentTarget);
+
+            var layer_id = link.data('layer-id');
+            var myLayer = L_layer_theme.getLayer(layer_id);
+            map.fitBounds(myLayer.getBounds());
+
+            if ($.support.currentGrid().grid == 'xs') {
+                jQuery('.mobile-sidebar').trigger('click');
+            }
+        },
+        initialize: function() {
+            this.render();
+        },
+        render: function() {
+            this.$el.html(this.template({theme: this.model.toJSON()}));
+
+            return this;
+        }
+    });
+
+    return PoiView;
+};
+
+},{"underscore":15}],14:[function(require,module,exports){
 var App = window.App || {};
 var Backbone = window.Backbone;
 var _ = require('underscore');
@@ -1963,6 +2023,10 @@ module.exports = function (map) {
             var layer_id = link.data('layer-id');
             var myLayer = L_layer_theme.getLayer(layer_id);
             map.fitBounds(myLayer.getBounds());
+
+            if ($.support.currentGrid().grid == 'xs') {
+                jQuery('.mobile-sidebar').trigger('click');
+            }
         },
         initialize: function() {
             // this.listenTo(this.model, "change", this.render);
@@ -2020,7 +2084,7 @@ module.exports = function (map) {
     return ThemeView;
 };
 
-},{"../../bower_components/leaflet/dist/leaflet":3,"../model/Layer":8,"underscore":13}],13:[function(require,module,exports){
+},{"../../bower_components/leaflet/dist/leaflet":3,"../model/Layer":8,"underscore":15}],15:[function(require,module,exports){
 //     Underscore.js 1.7.0
 //     http://underscorejs.org
 //     (c) 2009-2014 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors

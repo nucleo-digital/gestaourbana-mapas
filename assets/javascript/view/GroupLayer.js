@@ -75,7 +75,9 @@ module.exports = function (map) {
 
                     map.fitBounds(myLayer.getBounds());
                 }
-
+                if ($.support.currentGrid().grid == 'xs') {
+                    jQuery('.mobile-sidebar').trigger('click');
+                }
                 link.find('i').remove();
             }});
         },

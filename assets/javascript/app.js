@@ -46,6 +46,7 @@ jQuery(window).on('resize', adjustWorkingArea);
 
 // enable menu transition on mobile format
 jQuery('.mobile-sidebar').on('click', function (evt) {
+    evt.preventDefault();
     var el = jQuery('#sidebar');
 
     if (el.hasClass('desativado')) {
@@ -74,6 +75,7 @@ window.App = App;
 
 App.GroupLayerView = require('./view/GroupLayer')(map);
 App.ThemeView = require('./view/Theme')(map);
+App.PoiView = require('./view/Poi')();
 
 var Router = require('./router');
 

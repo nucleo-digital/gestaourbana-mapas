@@ -5,6 +5,8 @@ block body
             .theme
             .accordion-group
         #map.col-xs-12.col-s-9
+            .ponto-de-interesse.col-xs-12.col-s-3.offset-s-9
+                p Lorem ipsum dolor sit amet, consectetur adipisicing elit. Provident minus maxime ea, quibusdam recusandae? Blanditiis error, earum qui saepe. Sed nemo obcaecati necessitatibus atque, vero explicabo consequatur maxime ipsa pariatur.
     script(type="text/template", id="accordion-group-layers")
             <% _.each(groups, function(group) { %>
             .accordion
@@ -45,3 +47,7 @@ block body
                     strong <%= k %>
                     | : <%= v %>
                 <% }); %>
+
+    script(type="text/template", id="ponto-de-interesse-info")
+        .box
+            p testetttt

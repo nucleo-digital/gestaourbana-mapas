@@ -6,6 +6,7 @@ var L = require('../bower_components/leaflet/dist/leaflet');
 var LayerModel = require('./model/Layer');
 var ThemeModel = require('./model/Theme');
 var GroupLayerModel = require('./model/GroupLayer');
+var PoiModel = require('./model/Poi');
 
 var Router = Backbone.Router.extend({
     routes: {
@@ -41,9 +42,12 @@ var Router = Backbone.Router.extend({
     },
 
     show: function(id) {
-        // $(document.body).append("Show route has been called.. with id equals : " + id);
-
-        console.log("Router: "+ id);
+        var poi = new PoiModel({'_id':id});
+        poi.fetch({success:function(model, response, options) {
+            var g = new App.PoiView({
+                model:poi
+            });
+        }});
     },
 
     download: function(random) {
