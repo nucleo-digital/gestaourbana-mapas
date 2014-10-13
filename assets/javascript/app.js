@@ -1,4 +1,6 @@
 var jQuery = window.jQuery;
+var L = require('../bower_components/leaflet/dist/leaflet');
+
 window.Backbone = require('../bower_components/backbone/backbone');
 window.Backbone.$ = jQuery;
 
@@ -38,6 +40,7 @@ function adjustWorkingArea () {
         jQuery(panels).css({'height': h_window - h_footer - h_header - padding});
     });
 }
+
 adjustWorkingArea();
 jQuery(window).on('resize', adjustWorkingArea);
 
@@ -59,14 +62,20 @@ jQuery('.mobile-sidebar').on('click', function (evt) {
     }
 });
 
+// setup map config
+var map = L.map('map').setView([-23.55, -46.633333], 13);
+L.Icon.Default.imagePath = '/images/leaflet';
+L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
+}).addTo(map);
+
+var App = {};
+window.App = App;
+
+App.GroupLayerView = require('./view/GroupLayer')(map);
+App.ThemeView = require('./view/Theme')(map);
+
 var Router = require('./router');
 
-var App = {
-      Models: {},
-      Collections: {},
-      Views: {},
-      Router: Router
-  };
-
-new App.Router;
+App.Router = new Router;
 Backbone.history.start();

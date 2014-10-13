@@ -1,3 +1,4 @@
+var App = window.App || {};
 var Backbone = window.Backbone;
 var _ = require('underscore');
 var L = require('../../bower_components/leaflet/dist/leaflet');
@@ -55,15 +56,13 @@ module.exports = function (map) {
                     "weight": 3,
                     "opacity": 0.9
                 };
-                $("<style type='text/css'> .L_"+layer_id+" { color: "+current_color+"; } </style>").appendTo("head");
+
+                jQuery("<style type='text/css'> .L_"+layer_id+" { color: "+current_color+"; } </style>").appendTo("head");
                 link.css({'border-color':current_color});
-                // el_icon.toggleClass('fa-square-o');
-                // el_icon.toggleClass('fa-square');
-                // link.css({'background-color':current_color});
 
                 var layer = new LayerModel({'_id':layer_id});
-                // layer.set('color', current_color);
                 layer.set('myStyle', myStyle);
+
                 layer_themes.push(layer);
             });
 
@@ -74,7 +73,7 @@ module.exports = function (map) {
                         pointToLayer: function ( featureData, latlng ) {
                             var myIcon = L.divIcon({className: 'icon-theme fa fa-map-marker fa-3x L_'+model.id});
                             return L.marker(latlng, {icon: myIcon}).on('click', function (e) {
-                                console.log(featureData);
+                                App.Router.navigate('ponto-de-interesse/'+featureData._id, {trigger: true})
                             });;
                         }
                     });

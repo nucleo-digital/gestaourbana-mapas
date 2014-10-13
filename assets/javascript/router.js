@@ -1,65 +1,65 @@
+var App = window.App || {};
+
 var _ = require('underscore');
 var L = require('../bower_components/leaflet/dist/leaflet');
 
 var LayerModel = require('./model/Layer');
 var ThemeModel = require('./model/Theme');
-var GroupLayerModel = require('./model/GroupLayer')
+var GroupLayerModel = require('./model/GroupLayer');
 
-var router = Backbone.Router.extend({
-  routes: {
-      '': 'index',
-      'show/:id': 'show',
-      'download/*random': 'download',
-      'search/:query': 'search',
-      '*default': 'default'
-  },
+var Router = Backbone.Router.extend({
+    routes: {
+        '': 'index',
+        'ponto-de-interesse/:id': 'show',
+        'download/*random': 'download',
+        'search/:query': 'search',
+        '*default': 'default'
+    },
 
-  index: function(){
+    index: function() {
 
-    // setup map config
-    var map = L.map('map').setView([-23.55, -46.633333], 13);
-    L.Icon.Default.imagePath = '/images/leaflet';
-    L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
-    }).addTo(map);
+        var groups = new GroupLayerModel();
 
-    var GroupLayerView = require('./view/GroupLayer')(map);
-    var ThemeView = require('./view/Theme')(map);
+        groups.fetch({
+            success: function(model, response, options) {
+                var s = new App.GroupLayerView({
+                    model: groups
+                });
+            }
+        });
 
+        var theme_active = new ThemeModel();
 
-    var groups = new GroupLayerModel();
+        theme_active.fetch({
+            success: function(model, response, options) {
+                var t = new App.ThemeView({
+                    model: theme_active
+                });
+            }
+        });
 
-    groups.fetch({ success : function (model, response, options) {
-            var s = new GroupLayerView({model:groups});
-        }
-    });
+    },
 
-    var theme_active = new ThemeModel();
+    show: function(id) {
+        // $(document.body).append("Show route has been called.. with id equals : " + id);
 
-    theme_active.fetch({ success : function (model, response, options) {
-            var t = new ThemeView({model:theme_active});
-        }
-    });
+        console.log(id);
+    },
 
-  },
+    download: function(random) {
+        $(document.body).append("download route has been called.. with random equals : " + random);
+    },
 
-  show: function(id){
-      $(document.body).append("Show route has been called.. with id equals : " + id);
-  },
+    search: function(query) {
+        $(document.body).append("Search route has been called.. with query equals : " + query);
+    },
 
-  download: function(random){
-      $(document.body).append("download route has been called.. with random equals : " + random);
-  },
+    default: function(defaultt) {
+        $(document.body).append("This route is not hanled.. you tried to access: " + defaultt);
 
-  search: function(query){
-      $(document.body).append("Search route has been called.. with query equals : " + query);
-  },
-
-  default: function(defaultt){
-      $(document.body).append("This route is not hanled.. you tried to access: " + defaultt);
-
-  }
+    }
 
 });
 
-module.exports = router;
+
+module.exports = Router;
