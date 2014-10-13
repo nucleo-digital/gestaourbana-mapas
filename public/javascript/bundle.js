@@ -1809,7 +1809,7 @@ var Router = Backbone.Router.extend({
     show: function(id) {
         // $(document.body).append("Show route has been called.. with id equals : " + id);
 
-        console.log(id);
+        console.log("Router: "+ id);
     },
 
     download: function(random) {
