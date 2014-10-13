@@ -1,38 +1,9 @@
 var jQuery = window.jQuery;
-
-require('../bower_components/responsive/build/responsive.min');
-
-
-
-// add a marker in the given location, attach some popup content to it and open the popup
-// L.marker([51.5, -0.09]).addTo(map)
-//     .bindPopup('A pretty CSS3 popup. <br> Easily customizable.')
-//     .openPopup();
-
-
 window.Backbone = require('../bower_components/backbone/backbone');
 window.Backbone.$ = jQuery;
 
+require('../bower_components/responsive/build/responsive.min');
 var Sharrre = require('../bower_components/Sharrre/jquery.sharrre.min');
-
-
-// // Patch Model and Collection.
-// _.each(["Model", "Collection"], function(name) {
-//   // Cache Backbone constructor.
-//   var ctor = Backbone[name];
-//   // Cache original fetch.
-//   var fetch = ctor.prototype.fetch;
-
-//   // Override the fetch method to emit a fetch event.
-//   ctor.prototype.fetch = function() {
-//     // Trigger the fetch event on the instance.
-//     this.trigger("fetch", this);
-
-//     // Pass through to original fetch.
-//     return fetch.apply(this, arguments);
-//   };
-// });
-
 
 jQuery('#compartilhar').sharrre({
     share: {

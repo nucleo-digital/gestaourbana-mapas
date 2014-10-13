@@ -1633,40 +1633,11 @@ break}e||r.push(t),t.touches=r.slice(),t.changedTouches=[t],n(t)};if(t[a+"touchs
 },300))};"next"===i?(a>=s||0>a)&&(a=0):(a>=s&&(a=0),0>a&&(a=s-1)),this.$sibling=t(this.$group[a]),this.hide(!0,r)}},H.prototype.next=function(){this.direction("next")},H.prototype.prev=function(){this.direction("prev")},H.prototype.swipeend=function(t){return E?void this["right"===t.direction?"prev":"next"]():void this["right"===t.direction?"next":"prev"]()},t.fn.modal=function(e){return this.each(function(){var i=t(this),n=i.data("r.modal"),o="object"==typeof e?e:{};o.target||(o.target=i.attr("href")),n||i.data("r.modal",n=new H(this,o)),"string"==typeof e&&/(show|hide|next|prev)/.test(e)&&n[e]()})},t.fn.modal.Constructor=H;var R=t.fn.modal;t.fn.modal.noConflict=function(){return t.fn.modal=R,this};var L=function(){t(":attrStart(data-modal)").each(function(){var e=t(this),i=e.data("r.modalOptions");i||e.modal(t.buildDataOptions(e,{},"modal","r"))})},N=t.debounce(L,500);t(document).on([f,g,$].join(" "),function(t){"ready"===t.type?L():N()}),e.RESPONSIVE_MODAL=!0}}(jQuery,window,".r.modal"),function(t,e,i){"use strict";if(!e.RESPONSIVE_TABLE){var n="ready"+i,o=["domchanged"+i,"shown.r.modal"].join(" "),s="add"+i,a="added"+i,r=function(e){this.$element=t(e).addClass("table-list"),this.$thead=this.$element.find("thead"),this.$tfoot=this.$element.find("tfoot"),this.$tbody=this.$element.find("tbody"),this.$headerColumns=this.$thead.find("th"),this.$footerColumns=this.$tfoot.find("th"),this.$bodyRows=this.$tbody.find("tr"),this.isAdded=null,this.add()};r.prototype.add=function(){if(!this.isAdded){var e=this,i=t.Event(s),n=function(){e.$element.trigger(t.Event(a))};this.$element.trigger(i),i.isDefaultPrevented()||(this.isAdded=!0,t.each(this.$bodyRows,function(){t(this).find("th, td").each(function(i){var n=t(this),o=t(e.$headerColumns[i]).text();if(n.attr("data-thead",o),e.$tfoot.length){var s=t(e.$footerColumns[i]).text();n.attr("data-tfoot",s)}})}),this.$element.redraw().addClass("fade-in"),this.$element.onTransitionEnd(n))}},t.fn.tablelist=function(e){return this.each(function(){var i=t(this),n=i.data("r.tablelist"),o="object"==typeof e?e:null;n||i.data("r.tablelist",n=new r(this,o)),"string"==typeof e&&n[e]()})},t.fn.tablelist.Constructor=r;var d=t.fn.table;t.fn.tablelist.noConflict=function(){return t.fn.tablelist=d,this};var l=function(){t("table[data-table-list]").each(function(){var e=t(this),i=e.data("r.tablelistOptions");i||e.tablelist(t.buildDataOptions(e,{},"tablelist","r"))})},h=t.debounce(l,500);t(document).on([n,o].join(" "),function(t){"ready"===t.type?l():h()}),e.RESPONSIVE_TABLE=!0}}(jQuery,window,".r.tablelist"),function(t,e,i){"use strict";if(!e.RESPONSIVE_TABS){var n=t.support.rtl,o="ready"+i,s=["domchanged"+i,"shown.r.modal"].join(" "),a="click",r="keydown",d="show"+i,l="shown"+i,h={SPACE:32,LEFT:37,RIGHT:39},c=function(e){this.$element=t(e),this.tabbing=null;var i=this.$element.children("ul:first").attr("role","tablist"),n=i.children().attr("role","presentation"),o=this.$element.children(":not(ul)"),s=t.pseudoUnique();n.each(function(e){var i=t(this),n=i.children("a");n.attr({role:"tab",id:"tab-"+s+"-"+e,"aria-controls":"pane-"+s+"-"+e,"aria-selected":i.hasClass("tab-active")?!0:!1,tabIndex:0}),o.eq(e).attr({role:"tabpanel",id:"pane-"+s+"-"+e,"aria-labelledby":"tab-"+s+"-"+e,tabIndex:i.hasClass("tab-active")?0:-1})}),t(this.$element).on(a,"ul[role=tablist] > li > [role=tab]",t.proxy(this.click,this)).on(r,"ul[role=tablist] > li > [role=tab]",t.proxy(this.keydown,this))};c.prototype.show=function(e){var i=this.$element.children("ul").children(".tab-active"),n=i.parent().children(),o=n.index(i),s=this;return e>n.length-1||0>e?!1:o===e?!1:this.tab(o,e,function(e){var i=function(){s.tabbing=!1,s.$element.trigger(t.Event(l))};e.onTransitionEnd(i)})},c.prototype.tab=function(e,i,n){var o=t.Event(d),s=this.$element,a=s.children("ul").children("li"),r=s.children(":not(ul)"),l=a.eq(i),h=r.eq(e),c=r.eq(i);s.trigger(o),this.tabbing||o.isDefaultPrevented()||(this.tabbing=!0,a.removeClass("tab-active").children("a").attr({"aria-selected":!1}),l.addClass("tab-active").children("a").attr({"aria-selected":!0}).focus(),h.addClass("fade-out fade-in"),c.attr({tabIndex:0}).addClass("tab-pane-active fade-out"),r.filter(".fade-in").attr({tabIndex:-1}).removeClass("tab-pane-active fade-in"),c.redraw().addClass("fade-in"),n.call(this,c))},c.prototype.click=function(e){e.preventDefault(),e.stopPropagation();var i=t(e.target),n=i.parent(),o=n.index();this.show(o)},c.prototype.keydown=function(e){var i=e.which;if(i===h.SPACE||i===h.LEFT||i===h.RIGHT){e.preventDefault(),e.stopPropagation();var o=t(e.target),s=o.parent(),a=s.siblings().addBack(),r=a.length,d=s.index();if(i===h.SPACE)return void this.show(d);d=i===h.LEFT?n?d+1:d-1:n?d-1:d+1,d===r&&(d=0),0>d&&(d=r-1),this.show(d)}},t.fn.tabs=function(e){return this.each(function(){var i=t(this),n=i.data("r.tabs");n||i.data("r.tabs",n=new c(this)),"number"==typeof e&&n.show(e)})},t.fn.tabs.Constructor=c;var u=t.fn.tabs;t.fn.tabs.noConflict=function(){return t.fn.tabs=u,this};var p=function(){t("[data-tabs]").each(function(){var e=t(this),i=e.data("r.tabsLoaded");i||(e.data("r.tabsLoaded",!0),e.tabs())})},f=t.debounce(p,500);t(document).on([o,s].join(" "),function(t){"ready"===t.type?p():f()}),e.RESPONSIVE_TABS=!0}}(jQuery,window,".r.tabs");
 },{}],5:[function(require,module,exports){
 var jQuery = window.jQuery;
-
-require('../bower_components/responsive/build/responsive.min');
-
-
-
-// add a marker in the given location, attach some popup content to it and open the popup
-// L.marker([51.5, -0.09]).addTo(map)
-//     .bindPopup('A pretty CSS3 popup. <br> Easily customizable.')
-//     .openPopup();
-
-
 window.Backbone = require('../bower_components/backbone/backbone');
 window.Backbone.$ = jQuery;
 
+require('../bower_components/responsive/build/responsive.min');
 var Sharrre = require('../bower_components/Sharrre/jquery.sharrre.min');
-
-
-// // Patch Model and Collection.
-// _.each(["Model", "Collection"], function(name) {
-//   // Cache Backbone constructor.
-//   var ctor = Backbone[name];
-//   // Cache original fetch.
-//   var fetch = ctor.prototype.fetch;
-
-//   // Override the fetch method to emit a fetch event.
-//   ctor.prototype.fetch = function() {
-//     // Trigger the fetch event on the instance.
-//     this.trigger("fetch", this);
-
-//     // Pass through to original fetch.
-//     return fetch.apply(this, arguments);
-//   };
-// });
-
 
 jQuery('#compartilhar').sharrre({
     share: {

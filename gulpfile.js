@@ -35,14 +35,14 @@ var options = {};
 options.sass = {
     outputStyle: 'compressed',
     errLogToConsole: true,
-    sourceMap: 'sass',
-    sourceComments: 'map',
+    // sourceMap: 'sass',
+    // sourceComments: 'map',
     precision: 10,
     imagePath: paths.images.src,
     includePaths: [paths.styles.src]
 };
 options.autoprefixer = {
-    map: true,
+    // map: true,
     from: 'asset',
     to: 'style.css'
 };
