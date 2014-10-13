@@ -1,5 +1,6 @@
 var _ = require('underscore');
 var L = require('../bower_components/leaflet/dist/leaflet');
+var Backbone = window.Backbone;
 
 var map = L.map('map').setView([-23.55, -46.633333], 13);
 L.Icon.Default.imagePath = '/images/leaflet';
@@ -10,8 +11,6 @@ L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', {
 
 var L_layer_group = L.layerGroup().addTo(map);
 var L_layer_theme = L.featureGroup().addTo(map);
-
-var Backbone = window.Backbone;
 
 var router = Backbone.Router.extend({
   routes: {

@@ -28,6 +28,7 @@ jQuery('#compartilhar').sharrre({
     }
 });
 
+// set height of sidebar and map area to fit screen
 function adjustWorkingArea () {
     var h_header = jQuery('.header').height();
     var h_footer = jQuery('.footer').height();
@@ -40,13 +41,13 @@ function adjustWorkingArea () {
 adjustWorkingArea();
 jQuery(window).on('resize', adjustWorkingArea);
 
+// enable menu transition on mobile format
 jQuery('.mobile-sidebar').on('click', function (evt) {
     var el = jQuery('#sidebar');
-    // console.log(el.is(":visible"));
+
     if (el.hasClass('desativado')) {
         el.addClass('animated fadeInLeft');
         jQuery('#sidebar').one('webkitAnimationEnd mozAnimationEnd MSAnimationEnd oanimationend animationend', function () {
-            // el.addClass('desativado');
             el.removeClass('animated fadeInLeft desativado');
         });
     } else {
