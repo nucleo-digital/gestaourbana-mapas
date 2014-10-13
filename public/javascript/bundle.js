@@ -1617,7 +1617,7 @@
 
 }));
 
-},{"underscore":7}],3:[function(require,module,exports){
+},{"underscore":13}],3:[function(require,module,exports){
 /*
  Leaflet, a JavaScript library for mobile-friendly interactive maps. http://leafletjs.com
  (c) 2010-2013, Vladimir Agafonkin
@@ -1705,20 +1705,62 @@ var App = {
 new App.Router;
 Backbone.history.start();
 
-},{"../bower_components/Sharrre/jquery.sharrre.min":1,"../bower_components/backbone/backbone":2,"../bower_components/responsive/build/responsive.min":4,"./router":6}],6:[function(require,module,exports){
-var _ = require('underscore');
-var L = require('../bower_components/leaflet/dist/leaflet');
+},{"../bower_components/Sharrre/jquery.sharrre.min":1,"../bower_components/backbone/backbone":2,"../bower_components/responsive/build/responsive.min":4,"./router":10}],6:[function(require,module,exports){
+var Backbone = window.Backbone;
+var LayerModel = require('../model/Layer');
+
+module.exports = Backbone.Collection.extend({
+    model: LayerModel
+});
+
+},{"../model/Layer":8}],7:[function(require,module,exports){
+var Backbone = window.Backbone;
+var LayerCollection = require('../collection/Layer');
+
+
+module.exports = Backbone.Model.extend({
+        attributes : {
+            'name': 'Empty Group',
+            'layers': new LayerCollection(),
+            'created_at':  Date.now
+        },
+        idAttribute: "_id",
+        url: '/groups'
+    });
+
+},{"../collection/Layer":6}],8:[function(require,module,exports){
 var Backbone = window.Backbone;
 
-var map = L.map('map').setView([-23.55, -46.633333], 13);
-L.Icon.Default.imagePath = '/images/leaflet';
-// add an OpenStreetMap tile layer
-L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
-}).addTo(map);
+module.exports = Backbone.Model.extend({
+    attributes : {
+        'name': 'Empty Layer',
+        'features': {},
+        'created_at': Date.now
+    },
+    idAttribute: "_id",
+    urlRoot: '/layer'
+});
+},{}],9:[function(require,module,exports){
+var Backbone = window.Backbone;
+var LayerCollection = require('../collection/Layer');
 
-var L_layer_group = L.layerGroup().addTo(map);
-var L_layer_theme = L.featureGroup().addTo(map);
+module.exports = Backbone.Model.extend({
+        attributes : {
+            'name': 'Empty Theme',
+            'layers': new LayerCollection(),
+            'created_at':  Date.now
+        },
+        idAttribute: "_id",
+        url: '/themes/active'
+    });
+
+},{"../collection/Layer":6}],10:[function(require,module,exports){
+var _ = require('underscore');
+var L = require('../bower_components/leaflet/dist/leaflet');
+
+var LayerModel = require('./model/Layer');
+var ThemeModel = require('./model/Theme');
+var GroupLayerModel = require('./model/GroupLayer')
 
 var router = Backbone.Router.extend({
   routes: {
@@ -1731,33 +1773,73 @@ var router = Backbone.Router.extend({
 
   index: function(){
 
-    var Layer = Backbone.Model.extend({
-        attributes : {
-            'name': 'Empty Layer',
-            'features': {},
-            'created_at': Date.now
-        },
-        idAttribute: "_id",
-        urlRoot: '/layer'
+    // setup map config
+    var map = L.map('map').setView([-23.55, -46.633333], 13);
+    L.Icon.Default.imagePath = '/images/leaflet';
+    L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+
+    var GroupLayerView = require('./view/GroupLayer')(map);
+    var ThemeView = require('./view/Theme')(map);
+
+
+    var groups = new GroupLayerModel();
+
+    groups.fetch({ success : function (model, response, options) {
+            var s = new GroupLayerView({model:groups});
+        }
     });
 
-    var LayerCollection = Backbone.Collection.extend({
-        model: Layer
+    var theme_active = new ThemeModel();
+
+    theme_active.fetch({ success : function (model, response, options) {
+            var t = new ThemeView({model:theme_active});
+        }
     });
 
-    var GroupLayer = Backbone.Model.extend({
-        attributes : {
-            'name': 'Empty Group',
-            'layers': new LayerCollection(),
-            'created_at':  Date.now
-        },
-        idAttribute: "_id",
-        url: '/groups'
-    });
+  },
 
-    var groups = new GroupLayer();
+  show: function(id){
+      $(document.body).append("Show route has been called.. with id equals : " + id);
+  },
 
-    var AccordionView = Backbone.View.extend({
+  download: function(random){
+      $(document.body).append("download route has been called.. with random equals : " + random);
+  },
+
+  search: function(query){
+      $(document.body).append("Search route has been called.. with query equals : " + query);
+  },
+
+  default: function(defaultt){
+      $(document.body).append("This route is not hanled.. you tried to access: " + defaultt);
+
+  }
+
+});
+
+module.exports = router;
+
+},{"../bower_components/leaflet/dist/leaflet":3,"./model/GroupLayer":7,"./model/Layer":8,"./model/Theme":9,"./view/GroupLayer":11,"./view/Theme":12,"underscore":13}],11:[function(require,module,exports){
+var _ = require('underscore');
+var Backbone = window.Backbone;
+var LayerModel = require('../model/Layer');
+var L = require('../../bower_components/leaflet/dist/leaflet');
+
+module.exports = function (map) {
+
+    var onEachFeature = function (feature, layer) {
+        // does this feature have a property named popupContent?
+        if (feature.properties) {
+            var featurePopup = _.template(jQuery('#feature-popup').html());
+            layer.bindPopup(featurePopup({'feature':feature}));
+        }
+    }
+
+    var L_layer_group = L.layerGroup().addTo(map);
+
+    var GroupLayerView = Backbone.View.extend({
         tagName: 'div',
         el: '.accordion-group',
         template:  _.template( jQuery('#accordion-group-layers').html()),
@@ -1768,8 +1850,9 @@ var router = Backbone.Router.extend({
             e.preventDefault();
             var link = jQuery(e.currentTarget);
 
+
             var layer_id = link.data('layer-id');
-            var layer = new Layer({'_id':layer_id});
+            var layer = new LayerModel({'_id':layer_id});
 
             link.prepend('<i class="fa fa-circle-o-notch fa-spin"></i>');
             layer.fetch({ success : function (model, response, options) {
@@ -1805,11 +1888,9 @@ var router = Backbone.Router.extend({
                             if ( (feature.geometry.coordinates[0] == 0) &&
                                  (feature.geometry.coordinates[1] == 0) ) {
                                 return false;
-                            } else {
-                                return true;
                             }
 
-                            // return feature.properties.show_on_map;
+                            return true;
                         }
                     });
                     myLayer._leaflet_id = layer_id;
@@ -1831,23 +1912,19 @@ var router = Backbone.Router.extend({
         }
     });
 
-    groups.fetch({ success : function (model, response, options) {
-            var s = new AccordionView({model:groups});
-        }
-    });
+    return GroupLayerView;
+}
 
-    var Theme = Backbone.Model.extend({
-        attributes : {
-            'name': 'Empty Theme',
-            'layers': new LayerCollection(),
-            'created_at':  Date.now
-        },
-        idAttribute: "_id",
-        url: '/themes/active'
-    });
+},{"../../bower_components/leaflet/dist/leaflet":3,"../model/Layer":8,"underscore":13}],12:[function(require,module,exports){
+var Backbone = window.Backbone;
+var _ = require('underscore');
+var L = require('../../bower_components/leaflet/dist/leaflet');
+var LayerModel = require('../model/Layer');
 
-    var theme_active = new Theme();
+module.exports = function (map) {
+    var L_layer_theme = L.featureGroup().addTo(map);
 
+    // helper functions to render current view
     var toggleIconAccordion = function () {
         jQuery(".accordion-group").on("show.r.dropdown", function(event) {
             var el = jQuery(event.target).find('i.fa-angle-down');
@@ -1861,14 +1938,6 @@ var router = Backbone.Router.extend({
             el.removeClass('fa-angle-up');
         });
     };
-
-    var onEachFeature = function (feature, layer) {
-        // does this feature have a property named popupContent?
-        if (feature.properties) {
-            var featurePopup = _.template(jQuery('#feature-popup').html());
-            layer.bindPopup(featurePopup({'feature':feature}));
-        }
-    }
 
     var ThemeView = Backbone.View.extend({
         tagName: 'div',
@@ -1910,7 +1979,7 @@ var router = Backbone.Router.extend({
                 // el_icon.toggleClass('fa-square');
                 // link.css({'background-color':current_color});
 
-                var layer = new Layer({'_id':layer_id});
+                var layer = new LayerModel({'_id':layer_id});
                 // layer.set('color', current_color);
                 layer.set('myStyle', myStyle);
                 layer_themes.push(layer);
@@ -1940,45 +2009,10 @@ var router = Backbone.Router.extend({
         }
     });
 
-    theme_active.on('change', function(model) {
-        // console.log($('#sidebar').html(), model);
-        // $('#theme').find('.layer').trigger('click');
+    return ThemeView;
+};
 
-    });
-
-    theme_active.fetch({ success : function (model, response, options) {
-            var t = new ThemeView({model:theme_active});
-            // t.on('change', function(model) {
-            //     console.log($('#theme').html());
-            //     $('#theme').find('.layer').trigger('click');
-            // });
-        }
-    });
-
-  },
-
-  show: function(id){
-      $(document.body).append("Show route has been called.. with id equals : " + id);
-  },
-
-  download: function(random){
-      $(document.body).append("download route has been called.. with random equals : " + random);
-  },
-
-  search: function(query){
-      $(document.body).append("Search route has been called.. with query equals : " + query);
-  },
-
-  default: function(defaultt){
-      $(document.body).append("This route is not hanled.. you tried to access: " + defaultt);
-
-  }
-
-});
-
-module.exports = router;
-
-},{"../bower_components/leaflet/dist/leaflet":3,"underscore":7}],7:[function(require,module,exports){
+},{"../../bower_components/leaflet/dist/leaflet":3,"../model/Layer":8,"underscore":13}],13:[function(require,module,exports){
 //     Underscore.js 1.7.0
 //     http://underscorejs.org
 //     (c) 2009-2014 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
