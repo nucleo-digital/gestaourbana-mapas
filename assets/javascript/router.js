@@ -1,6 +1,9 @@
 var App = window.App || {};
 
-var _ = require('underscore');
+window._ = require('underscore');
+window.Eventable = require('../bower_components/Eventable/eventable');
+require('../bower_components/sir-trevor-js/sir-trevor');
+
 var L = require('../bower_components/leaflet/dist/leaflet');
 
 var LayerModel = require('./model/Layer');
@@ -12,7 +15,7 @@ var Router = Backbone.Router.extend({
     routes: {
         '': 'index',
         'ponto-de-interesse/:id': 'show',
-        'noticia/criar': 'noticiaCriar',
+        'noticia/criar/:poi_id': 'noticiaCriar',
         'search/:query': 'search',
         '*default': 'default'
     },
@@ -50,9 +53,9 @@ var Router = Backbone.Router.extend({
         }});
     },
 
-    noticiaCriar: function () {
+    noticiaCriar: function (poi_id) {
         jQuery('.modal-noticia-criar').trigger('click');
-        console.log('abrir modal');
+        new SirTrevor.Editor({ el: $('.js-st-instance') });
     },
 
     download: function(random) {

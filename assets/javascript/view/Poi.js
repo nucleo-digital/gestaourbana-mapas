@@ -9,14 +9,14 @@ module.exports = function () {
         el: '.ponto-de-interesse',
         template:  _.template( jQuery('#ponto-de-interesse-info').html()),
         events: {
-            'click .pre-noticia-criar': "zoom"
+            // 'click .pre-noticia-criar': "zoom"
         },
         zoom : function (e) {
             e.preventDefault();
 
 
             // console.log(e.currentTarget.href);
-            App.Router.navigate('noticia/criar', {trigger: true})
+            // App.Router.navigate(e.currentTarget.href, {trigger: true})
             // var link = jQuery(e.currentTarget);
 
             // var layer_id = link.data('layer-id');

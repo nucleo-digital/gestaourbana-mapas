@@ -1,4 +1,198 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);throw new Error("Cannot find module '"+o+"'")}var f=n[o]={exports:{}};t[o][0].call(f.exports,function(e){var n=t[o][1][e];return s(n?n:e)},f,f.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+(function (root, factory) {
+  if (typeof define === 'function' && define.amd) {
+    // AMD. Register as a module.
+    define('eventable', ['underscore'], function(_) {
+      return (root.Eventable = factory(_));
+    });
+  } else if (typeof exports !== 'undefined') {
+    // Node. Does not work with strict CommonJS, but only CommonJS-like
+    // enviroments that support module.exports, like Node.
+    var _ = require('underscore');
+    module.exports = factory(_);
+  } else {
+    // Browser globals
+    root.Eventable = factory(root._);
+  }
+}(this, function(_) {
+
+  // Copy and pasted straight out of Backbone 1.0.0
+  // We'll try and keep this updated to the latest
+
+  var array = [];
+  var slice = array.slice;
+
+  // Backbone.Events
+  // ---------------
+
+  // A module that can be mixed in to *any object* in order to provide it with
+  // custom events. You may bind with `on` or remove with `off` callback
+  // functions to an event; `trigger`-ing an event fires all callbacks in
+  // succession.
+  //
+  //     var object = {};
+  //     _.extend(object, Backbone.Events);
+  //     object.on('expand', function(){ alert('expanded'); });
+  //     object.trigger('expand');
+  //
+  var Eventable = {
+
+    // Bind an event to a `callback` function. Passing `"all"` will bind
+    // the callback to all events fired.
+    on: function(name, callback, context) {
+      if (!eventsApi(this, 'on', name, [callback, context]) || !callback) return this;
+      this._events || (this._events = {});
+      var events = this._events[name] || (this._events[name] = []);
+      events.push({callback: callback, context: context, ctx: context || this});
+      return this;
+    },
+
+    // Bind an event to only be triggered a single time. After the first time
+    // the callback is invoked, it will be removed.
+    once: function(name, callback, context) {
+      if (!eventsApi(this, 'once', name, [callback, context]) || !callback) return this;
+      var self = this;
+      var once = _.once(function() {
+        self.off(name, once);
+        callback.apply(this, arguments);
+      });
+      once._callback = callback;
+      return this.on(name, once, context);
+    },
+
+    // Remove one or many callbacks. If `context` is null, removes all
+    // callbacks with that function. If `callback` is null, removes all
+    // callbacks for the event. If `name` is null, removes all bound
+    // callbacks for all events.
+    off: function(name, callback, context) {
+      var retain, ev, events, names, i, l, j, k;
+      if (!this._events || !eventsApi(this, 'off', name, [callback, context])) return this;
+      if (!name && !callback && !context) {
+        this._events = {};
+        return this;
+      }
+
+      names = name ? [name] : _.keys(this._events);
+      for (i = 0, l = names.length; i < l; i++) {
+        name = names[i];
+        if (events = this._events[name]) {
+          this._events[name] = retain = [];
+          if (callback || context) {
+            for (j = 0, k = events.length; j < k; j++) {
+              ev = events[j];
+              if ((callback && callback !== ev.callback && callback !== ev.callback._callback) ||
+                  (context && context !== ev.context)) {
+                retain.push(ev);
+              }
+            }
+          }
+          if (!retain.length) delete this._events[name];
+        }
+      }
+
+      return this;
+    },
+
+    // Trigger one or many events, firing all bound callbacks. Callbacks are
+    // passed the same arguments as `trigger` is, apart from the event name
+    // (unless you're listening on `"all"`, which will cause your callback to
+    // receive the true name of the event as the first argument).
+    trigger: function(name) {
+      if (!this._events) return this;
+      var args = slice.call(arguments, 1);
+      if (!eventsApi(this, 'trigger', name, args)) return this;
+      var events = this._events[name];
+      var allEvents = this._events.all;
+      if (events) triggerEvents(events, args);
+      if (allEvents) triggerEvents(allEvents, arguments);
+      return this;
+    },
+
+    // Tell this object to stop listening to either specific events ... or
+    // to every object it's currently listening to.
+    stopListening: function(obj, name, callback) {
+      var listeners = this._listeners;
+      if (!listeners) return this;
+      var deleteListener = !name && !callback;
+      if (typeof name === 'object') callback = this;
+      if (obj) (listeners = {})[obj._listenerId] = obj;
+      for (var id in listeners) {
+        listeners[id].off(name, callback, this);
+        if (deleteListener) delete this._listeners[id];
+      }
+      return this;
+    }
+
+  };
+
+  // Regular expression used to split event strings.
+  var eventSplitter = /\s+/;
+
+  // Implement fancy features of the Events API such as multiple event
+  // names `"change blur"` and jQuery-style event maps `{change: action}`
+  // in terms of the existing API.
+  var eventsApi = function(obj, action, name, rest) {
+    if (!name) return true;
+
+    // Handle event maps.
+    if (typeof name === 'object') {
+      for (var key in name) {
+        obj[action].apply(obj, [key, name[key]].concat(rest));
+      }
+      return false;
+    }
+
+    // Handle space separated event names.
+    if (eventSplitter.test(name)) {
+      var names = name.split(eventSplitter);
+      for (var i = 0, l = names.length; i < l; i++) {
+        obj[action].apply(obj, [names[i]].concat(rest));
+      }
+      return false;
+    }
+
+    return true;
+  };
+
+  // A difficult-to-believe, but optimized internal dispatch function for
+  // triggering events. Tries to keep the usual cases speedy (most internal
+  // Backbone events have 3 arguments).
+  var triggerEvents = function(events, args) {
+    var ev, i = -1, l = events.length, a1 = args[0], a2 = args[1], a3 = args[2];
+    switch (args.length) {
+      case 0: while (++i < l) (ev = events[i]).callback.call(ev.ctx); return;
+      case 1: while (++i < l) (ev = events[i]).callback.call(ev.ctx, a1); return;
+      case 2: while (++i < l) (ev = events[i]).callback.call(ev.ctx, a1, a2); return;
+      case 3: while (++i < l) (ev = events[i]).callback.call(ev.ctx, a1, a2, a3); return;
+      default: while (++i < l) (ev = events[i]).callback.apply(ev.ctx, args);
+    }
+  };
+
+  var listenMethods = {listenTo: 'on', listenToOnce: 'once'};
+
+  // Inversion-of-control versions of `on` and `once`. Tell *this* object to
+  // listen to an event in another object ... keeping track of what it's
+  // listening to.
+  _.each(listenMethods, function(implementation, method) {
+    Eventable[method] = function(obj, name, callback) {
+      var listeners = this._listeners || (this._listeners = {});
+      var id = obj._listenerId || (obj._listenerId = _.uniqueId('l'));
+      listeners[id] = obj;
+      if (typeof name === 'object') callback = this;
+      obj[implementation](name, callback, this);
+      return this;
+    };
+  });
+
+  // Aliases for backwards compatibility.
+  Eventable.bind   = Eventable.on;
+  Eventable.unbind = Eventable.off;
+
+  return Eventable;
+
+}));
+
+},{"underscore":17}],2:[function(require,module,exports){
 /*!
  *  Sharrre.com - Make your sharing widget!
  *  Version: beta 1.3.5
@@ -7,7 +201,7 @@
  */
 ;(function(g,i,j,b){var h="sharrre",f={className:"sharrre",share:{googlePlus:false,facebook:false,twitter:false,digg:false,delicious:false,stumbleupon:false,linkedin:false,pinterest:false},shareTotal:0,template:"",title:"",url:j.location.href,text:j.title,urlCurl:"sharrre.php",count:{},total:0,shorterTotal:true,enableHover:true,enableCounter:true,enableTracking:false,hover:function(){},hide:function(){},click:function(){},render:function(){},buttons:{googlePlus:{url:"",urlCount:false,size:"medium",lang:"en-US",annotation:""},facebook:{url:"",urlCount:false,action:"like",layout:"button_count",width:"",send:"false",faces:"false",colorscheme:"",font:"",lang:"en_US"},twitter:{url:"",urlCount:false,count:"horizontal",hashtags:"",via:"",related:"",lang:"en"},digg:{url:"",urlCount:false,type:"DiggCompact"},delicious:{url:"",urlCount:false,size:"medium"},stumbleupon:{url:"",urlCount:false,layout:"1"},linkedin:{url:"",urlCount:false,counter:""},pinterest:{url:"",media:"",description:"",layout:"horizontal"}}},c={googlePlus:"",facebook:"https://graph.facebook.com/fql?q=SELECT%20url,%20normalized_url,%20share_count,%20like_count,%20comment_count,%20total_count,commentsbox_count,%20comments_fbid,%20click_count%20FROM%20link_stat%20WHERE%20url=%27{url}%27&callback=?",twitter:"http://cdn.api.twitter.com/1/urls/count.json?url={url}&callback=?",digg:"http://services.digg.com/2.0/story.getInfo?links={url}&type=javascript&callback=?",delicious:"http://feeds.delicious.com/v2/json/urlinfo/data?url={url}&callback=?",stumbleupon:"",linkedin:"http://www.linkedin.com/countserv/count/share?format=jsonp&url={url}&callback=?",pinterest:"http://api.pinterest.com/v1/urls/count.json?url={url}&callback=?"},l={googlePlus:function(m){var n=m.options.buttons.googlePlus;g(m.element).find(".buttons").append('<div class="button googleplus"><div class="g-plusone" data-size="'+n.size+'" data-href="'+(n.url!==""?n.url:m.options.url)+'" data-annotation="'+n.annotation+'"></div></div>');i.___gcfg={lang:m.options.buttons.googlePlus.lang};var o=0;if(typeof gapi==="undefined"&&o==0){o=1;(function(){var p=j.createElement("script");p.type="text/javascript";p.async=true;p.src="//apis.google.com/js/plusone.js";var q=j.getElementsByTagName("script")[0];q.parentNode.insertBefore(p,q)})()}else{gapi.plusone.go()}},facebook:function(m){var n=m.options.buttons.facebook;g(m.element).find(".buttons").append('<div class="button facebook"><div id="fb-root"></div><div class="fb-like" data-href="'+(n.url!==""?n.url:m.options.url)+'" data-send="'+n.send+'" data-layout="'+n.layout+'" data-width="'+n.width+'" data-show-faces="'+n.faces+'" data-action="'+n.action+'" data-colorscheme="'+n.colorscheme+'" data-font="'+n.font+'" data-via="'+n.via+'"></div></div>');var o=0;if(typeof FB==="undefined"&&o==0){o=1;(function(t,p,u){var r,q=t.getElementsByTagName(p)[0];if(t.getElementById(u)){return}r=t.createElement(p);r.id=u;r.src="//connect.facebook.net/"+n.lang+"/all.js#xfbml=1";q.parentNode.insertBefore(r,q)}(j,"script","facebook-jssdk"))}else{FB.XFBML.parse()}},twitter:function(m){var n=m.options.buttons.twitter;g(m.element).find(".buttons").append('<div class="button twitter"><a href="https://twitter.com/share" class="twitter-share-button" data-url="'+(n.url!==""?n.url:m.options.url)+'" data-count="'+n.count+'" data-text="'+m.options.text+'" data-via="'+n.via+'" data-hashtags="'+n.hashtags+'" data-related="'+n.related+'" data-lang="'+n.lang+'">Tweet</a></div>');var o=0;if(typeof twttr==="undefined"&&o==0){o=1;(function(){var q=j.createElement("script");q.type="text/javascript";q.async=true;q.src="//platform.twitter.com/widgets.js";var p=j.getElementsByTagName("script")[0];p.parentNode.insertBefore(q,p)})()}else{g.ajax({url:"//platform.twitter.com/widgets.js",dataType:"script",cache:true})}},digg:function(m){var n=m.options.buttons.digg;g(m.element).find(".buttons").append('<div class="button digg"><a class="DiggThisButton '+n.type+'" rel="nofollow external" href="http://digg.com/submit?url='+encodeURIComponent((n.url!==""?n.url:m.options.url))+'"></a></div>');var o=0;if(typeof __DBW==="undefined"&&o==0){o=1;(function(){var q=j.createElement("SCRIPT"),p=j.getElementsByTagName("SCRIPT")[0];q.type="text/javascript";q.async=true;q.src="//widgets.digg.com/buttons.js";p.parentNode.insertBefore(q,p)})()}},delicious:function(o){if(o.options.buttons.delicious.size=="tall"){var p="width:50px;",n="height:35px;width:50px;font-size:15px;line-height:35px;",m="height:18px;line-height:18px;margin-top:3px;"}else{var p="width:93px;",n="float:right;padding:0 3px;height:20px;width:26px;line-height:20px;",m="float:left;height:20px;line-height:20px;"}var q=o.shorterTotal(o.options.count.delicious);if(typeof q==="undefined"){q=0}g(o.element).find(".buttons").append('<div class="button delicious"><div style="'+p+'font:12px Arial,Helvetica,sans-serif;cursor:pointer;color:#666666;display:inline-block;float:none;height:20px;line-height:normal;margin:0;padding:0;text-indent:0;vertical-align:baseline;"><div style="'+n+'background-color:#fff;margin-bottom:5px;overflow:hidden;text-align:center;border:1px solid #ccc;border-radius:3px;">'+q+'</div><div style="'+m+'display:block;padding:0;text-align:center;text-decoration:none;width:50px;background-color:#7EACEE;border:1px solid #40679C;border-radius:3px;color:#fff;"><img src="http://www.delicious.com/static/img/delicious.small.gif" height="10" width="10" alt="Delicious" /> Add</div></div></div>');g(o.element).find(".delicious").on("click",function(){o.openPopup("delicious")})},stumbleupon:function(m){var n=m.options.buttons.stumbleupon;g(m.element).find(".buttons").append('<div class="button stumbleupon"><su:badge layout="'+n.layout+'" location="'+(n.url!==""?n.url:m.options.url)+'"></su:badge></div>');var o=0;if(typeof STMBLPN==="undefined"&&o==0){o=1;(function(){var p=j.createElement("script");p.type="text/javascript";p.async=true;p.src="//platform.stumbleupon.com/1/widgets.js";var q=j.getElementsByTagName("script")[0];q.parentNode.insertBefore(p,q)})();s=i.setTimeout(function(){if(typeof STMBLPN!=="undefined"){STMBLPN.processWidgets();clearInterval(s)}},500)}else{STMBLPN.processWidgets()}},linkedin:function(m){var n=m.options.buttons.linkedin;g(m.element).find(".buttons").append('<div class="button linkedin"><script type="in/share" data-url="'+(n.url!==""?n.url:m.options.url)+'" data-counter="'+n.counter+'"><\/script></div>');var o=0;if(typeof i.IN==="undefined"&&o==0){o=1;(function(){var p=j.createElement("script");p.type="text/javascript";p.async=true;p.src="//platform.linkedin.com/in.js";var q=j.getElementsByTagName("script")[0];q.parentNode.insertBefore(p,q)})()}else{i.IN.init()}},pinterest:function(m){var n=m.options.buttons.pinterest;g(m.element).find(".buttons").append('<div class="button pinterest"><a href="http://pinterest.com/pin/create/button/?url='+(n.url!==""?n.url:m.options.url)+"&media="+n.media+"&description="+n.description+'" class="pin-it-button" count-layout="'+n.layout+'">Pin It</a></div>');(function(){var o=j.createElement("script");o.type="text/javascript";o.async=true;o.src="//assets.pinterest.com/js/pinit.js";var p=j.getElementsByTagName("script")[0];p.parentNode.insertBefore(o,p)})()}},d={googlePlus:function(){},facebook:function(){fb=i.setInterval(function(){if(typeof FB!=="undefined"){FB.Event.subscribe("edge.create",function(m){_gaq.push(["_trackSocial","facebook","like",m])});FB.Event.subscribe("edge.remove",function(m){_gaq.push(["_trackSocial","facebook","unlike",m])});FB.Event.subscribe("message.send",function(m){_gaq.push(["_trackSocial","facebook","send",m])});clearInterval(fb)}},1000)},twitter:function(){tw=i.setInterval(function(){if(typeof twttr!=="undefined"){twttr.events.bind("tweet",function(m){if(m){_gaq.push(["_trackSocial","twitter","tweet"])}});clearInterval(tw)}},1000)},digg:function(){},delicious:function(){},stumbleupon:function(){},linkedin:function(){function m(){_gaq.push(["_trackSocial","linkedin","share"])}},pinterest:function(){}},a={googlePlus:function(m){i.open("https://plus.google.com/share?hl="+m.buttons.googlePlus.lang+"&url="+encodeURIComponent((m.buttons.googlePlus.url!==""?m.buttons.googlePlus.url:m.url)),"","toolbar=0, status=0, width=900, height=500")},facebook:function(m){i.open("http://www.facebook.com/sharer/sharer.php?u="+encodeURIComponent((m.buttons.facebook.url!==""?m.buttons.facebook.url:m.url))+"&t="+m.text+"","","toolbar=0, status=0, width=900, height=500")},twitter:function(m){i.open("https://twitter.com/intent/tweet?text="+encodeURIComponent(m.text)+"&url="+encodeURIComponent((m.buttons.twitter.url!==""?m.buttons.twitter.url:m.url))+(m.buttons.twitter.via!==""?"&via="+m.buttons.twitter.via:""),"","toolbar=0, status=0, width=650, height=360")},digg:function(m){i.open("http://digg.com/tools/diggthis/submit?url="+encodeURIComponent((m.buttons.digg.url!==""?m.buttons.digg.url:m.url))+"&title="+m.text+"&related=true&style=true","","toolbar=0, status=0, width=650, height=360")},delicious:function(m){i.open("http://www.delicious.com/save?v=5&noui&jump=close&url="+encodeURIComponent((m.buttons.delicious.url!==""?m.buttons.delicious.url:m.url))+"&title="+m.text,"delicious","toolbar=no,width=550,height=550")},stumbleupon:function(m){i.open("http://www.stumbleupon.com/badge/?url="+encodeURIComponent((m.buttons.delicious.url!==""?m.buttons.delicious.url:m.url)),"stumbleupon","toolbar=no,width=550,height=550")},linkedin:function(m){i.open("https://www.linkedin.com/cws/share?url="+encodeURIComponent((m.buttons.delicious.url!==""?m.buttons.delicious.url:m.url))+"&token=&isFramed=true","linkedin","toolbar=no,width=550,height=550")},pinterest:function(m){i.open("http://pinterest.com/pin/create/button/?url="+encodeURIComponent((m.buttons.pinterest.url!==""?m.buttons.pinterest.url:m.url))+"&media="+encodeURIComponent(m.buttons.pinterest.media)+"&description="+m.buttons.pinterest.description,"pinterest","toolbar=no,width=700,height=300")}};function k(n,m){this.element=n;this.options=g.extend(true,{},f,m);this.options.share=m.share;this._defaults=f;this._name=h;this.init()}k.prototype.init=function(){var m=this;if(this.options.urlCurl!==""){c.googlePlus=this.options.urlCurl+"?url={url}&type=googlePlus";c.stumbleupon=this.options.urlCurl+"?url={url}&type=stumbleupon"}g(this.element).addClass(this.options.className);if(typeof g(this.element).data("title")!=="undefined"){this.options.title=g(this.element).attr("data-title")}if(typeof g(this.element).data("url")!=="undefined"){this.options.url=g(this.element).data("url")}if(typeof g(this.element).data("text")!=="undefined"){this.options.text=g(this.element).data("text")}g.each(this.options.share,function(n,o){if(o===true){m.options.shareTotal++}});if(m.options.enableCounter===true){g.each(this.options.share,function(n,p){if(p===true){try{m.getSocialJson(n)}catch(o){}}})}else{if(m.options.template!==""){this.options.render(this,this.options)}else{this.loadButtons()}}g(this.element).hover(function(){if(g(this).find(".buttons").length===0&&m.options.enableHover===true){m.loadButtons()}m.options.hover(m,m.options)},function(){m.options.hide(m,m.options)});g(this.element).click(function(){m.options.click(m,m.options);return false})};k.prototype.loadButtons=function(){var m=this;g(this.element).append('<div class="buttons"></div>');g.each(m.options.share,function(n,o){if(o==true){l[n](m);if(m.options.enableTracking===true){d[n]()}}})};k.prototype.getSocialJson=function(o){var m=this,p=0,n=c[o].replace("{url}",encodeURIComponent(this.options.url));if(this.options.buttons[o].urlCount===true&&this.options.buttons[o].url!==""){n=c[o].replace("{url}",this.options.buttons[o].url)}if(n!=""&&m.options.urlCurl!==""){g.getJSON(n,function(r){if(typeof r.count!=="undefined"){var q=r.count+"";q=q.replace("\u00c2\u00a0","");p+=parseInt(q,10)}else{if(r.data&&r.data.length>0&&typeof r.data[0].total_count!=="undefined"){p+=parseInt(r.data[0].total_count,10)}else{if(typeof r[0]!=="undefined"){p+=parseInt(r[0].total_posts,10)}else{if(typeof r[0]!=="undefined"){}}}}m.options.count[o]=p;m.options.total+=p;m.renderer();m.rendererPerso()}).error(function(){m.options.count[o]=0;m.rendererPerso()})}else{m.renderer();m.options.count[o]=0;m.rendererPerso()}};k.prototype.rendererPerso=function(){var m=0;for(e in this.options.count){m++}if(m===this.options.shareTotal){this.options.render(this,this.options)}};k.prototype.renderer=function(){var n=this.options.total,m=this.options.template;if(this.options.shorterTotal===true){n=this.shorterTotal(n)}if(m!==""){m=m.replace("{total}",n);g(this.element).html(m)}else{g(this.element).html('<div class="box"><a class="count" href="#">'+n+"</a>"+(this.options.title!==""?'<a class="share" href="#">'+this.options.title+"</a>":"")+"</div>")}};k.prototype.shorterTotal=function(m){if(m>=1000000){m=(m/1000000).toFixed(2)+"M"}else{if(m>=1000){m=(m/1000).toFixed(1)+"k"}}return m};k.prototype.openPopup=function(m){a[m](this.options);if(this.options.enableTracking===true){var n={googlePlus:{site:"Google",action:"+1"},facebook:{site:"facebook",action:"like"},twitter:{site:"twitter",action:"tweet"},digg:{site:"digg",action:"add"},delicious:{site:"delicious",action:"add"},stumbleupon:{site:"stumbleupon",action:"add"},linkedin:{site:"linkedin",action:"share"},pinterest:{site:"pinterest",action:"pin"}};_gaq.push(["_trackSocial",n[m].site,n[m].action])}};k.prototype.simulateClick=function(){var m=g(this.element).html();g(this.element).html(m.replace(this.options.total,this.options.total+1))};k.prototype.update=function(m,n){if(m!==""){this.options.url=m}if(n!==""){this.options.text=n}};g.fn[h]=function(n){var m=arguments;if(n===b||typeof n==="object"){return this.each(function(){if(!g.data(this,"plugin_"+h)){g.data(this,"plugin_"+h,new k(this,n))}})}else{if(typeof n==="string"&&n[0]!=="_"&&n!=="init"){return this.each(function(){var o=g.data(this,"plugin_"+h);if(o instanceof k&&typeof o[n]==="function"){o[n].apply(o,Array.prototype.slice.call(m,1))}})}}}})(jQuery,window,document);
 
-},{}],2:[function(require,module,exports){
+},{}],3:[function(require,module,exports){
 //     Backbone.js 1.1.2
 
 //     (c) 2010-2014 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
@@ -1617,7 +1811,7 @@
 
 }));
 
-},{"underscore":15}],3:[function(require,module,exports){
+},{"underscore":17}],4:[function(require,module,exports){
 /*
  Leaflet, a JavaScript library for mobile-friendly interactive maps. http://leafletjs.com
  (c) 2010-2013, Vladimir Agafonkin
@@ -1627,11 +1821,3181 @@
 return new o.LatLng(u*i,a)}},o.CRS.EPSG3395=o.extend({},o.CRS,{code:"EPSG:3395",projection:o.Projection.Mercator,transformation:function(){var t=o.Projection.Mercator,e=t.R_MAJOR,i=.5/(Math.PI*e);return new o.Transformation(i,.5,-i,.5)}()}),o.TileLayer=o.Class.extend({includes:o.Mixin.Events,options:{minZoom:0,maxZoom:18,tileSize:256,subdomains:"abc",errorTileUrl:"",attribution:"",zoomOffset:0,opacity:1,unloadInvisibleTiles:o.Browser.mobile,updateWhenIdle:o.Browser.mobile},initialize:function(t,e){e=o.setOptions(this,e),e.detectRetina&&o.Browser.retina&&e.maxZoom>0&&(e.tileSize=Math.floor(e.tileSize/2),e.zoomOffset++,e.minZoom>0&&e.minZoom--,this.options.maxZoom--),e.bounds&&(e.bounds=o.latLngBounds(e.bounds)),this._url=t;var i=this.options.subdomains;"string"==typeof i&&(this.options.subdomains=i.split(""))},onAdd:function(t){this._map=t,this._animated=t._zoomAnimated,this._initContainer(),t.on({viewreset:this._reset,moveend:this._update},this),this._animated&&t.on({zoomanim:this._animateZoom,zoomend:this._endZoomAnim},this),this.options.updateWhenIdle||(this._limitedUpdate=o.Util.limitExecByInterval(this._update,150,this),t.on("move",this._limitedUpdate,this)),this._reset(),this._update()},addTo:function(t){return t.addLayer(this),this},onRemove:function(t){this._container.parentNode.removeChild(this._container),t.off({viewreset:this._reset,moveend:this._update},this),this._animated&&t.off({zoomanim:this._animateZoom,zoomend:this._endZoomAnim},this),this.options.updateWhenIdle||t.off("move",this._limitedUpdate,this),this._container=null,this._map=null},bringToFront:function(){var t=this._map._panes.tilePane;return this._container&&(t.appendChild(this._container),this._setAutoZIndex(t,Math.max)),this},bringToBack:function(){var t=this._map._panes.tilePane;return this._container&&(t.insertBefore(this._container,t.firstChild),this._setAutoZIndex(t,Math.min)),this},getAttribution:function(){return this.options.attribution},getContainer:function(){return this._container},setOpacity:function(t){return this.options.opacity=t,this._map&&this._updateOpacity(),this},setZIndex:function(t){return this.options.zIndex=t,this._updateZIndex(),this},setUrl:function(t,e){return this._url=t,e||this.redraw(),this},redraw:function(){return this._map&&(this._reset({hard:!0}),this._update()),this},_updateZIndex:function(){this._container&&this.options.zIndex!==i&&(this._container.style.zIndex=this.options.zIndex)},_setAutoZIndex:function(t,e){var i,n,o,s=t.children,a=-e(1/0,-1/0);for(n=0,o=s.length;o>n;n++)s[n]!==this._container&&(i=parseInt(s[n].style.zIndex,10),isNaN(i)||(a=e(a,i)));this.options.zIndex=this._container.style.zIndex=(isFinite(a)?a:0)+e(1,-1)},_updateOpacity:function(){var t,e=this._tiles;if(o.Browser.ielt9)for(t in e)o.DomUtil.setOpacity(e[t],this.options.opacity);else o.DomUtil.setOpacity(this._container,this.options.opacity)},_initContainer:function(){var t=this._map._panes.tilePane;if(!this._container){if(this._container=o.DomUtil.create("div","leaflet-layer"),this._updateZIndex(),this._animated){var e="leaflet-tile-container";this._bgBuffer=o.DomUtil.create("div",e,this._container),this._tileContainer=o.DomUtil.create("div",e,this._container)}else this._tileContainer=this._container;t.appendChild(this._container),this.options.opacity<1&&this._updateOpacity()}},_reset:function(t){for(var e in this._tiles)this.fire("tileunload",{tile:this._tiles[e]});this._tiles={},this._tilesToLoad=0,this.options.reuseTiles&&(this._unusedTiles=[]),this._tileContainer.innerHTML="",this._animated&&t&&t.hard&&this._clearBgBuffer(),this._initContainer()},_getTileSize:function(){var t=this._map,e=t.getZoom()+this.options.zoomOffset,i=this.options.maxNativeZoom,n=this.options.tileSize;return i&&e>i&&(n=Math.round(t.getZoomScale(e)/t.getZoomScale(i)*n)),n},_update:function(){if(this._map){var t=this._map,e=t.getPixelBounds(),i=t.getZoom(),n=this._getTileSize();if(!(i>this.options.maxZoom||i<this.options.minZoom)){var s=o.bounds(e.min.divideBy(n)._floor(),e.max.divideBy(n)._floor());this._addTilesFromCenterOut(s),(this.options.unloadInvisibleTiles||this.options.reuseTiles)&&this._removeOtherTiles(s)}}},_addTilesFromCenterOut:function(t){var i,n,s,a=[],r=t.getCenter();for(i=t.min.y;i<=t.max.y;i++)for(n=t.min.x;n<=t.max.x;n++)s=new o.Point(n,i),this._tileShouldBeLoaded(s)&&a.push(s);var h=a.length;if(0!==h){a.sort(function(t,e){return t.distanceTo(r)-e.distanceTo(r)});var l=e.createDocumentFragment();for(this._tilesToLoad||this.fire("loading"),this._tilesToLoad+=h,n=0;h>n;n++)this._addTile(a[n],l);this._tileContainer.appendChild(l)}},_tileShouldBeLoaded:function(t){if(t.x+":"+t.y in this._tiles)return!1;var e=this.options;if(!e.continuousWorld){var i=this._getWrapTileNum();if(e.noWrap&&(t.x<0||t.x>=i.x)||t.y<0||t.y>=i.y)return!1}if(e.bounds){var n=e.tileSize,o=t.multiplyBy(n),s=o.add([n,n]),a=this._map.unproject(o),r=this._map.unproject(s);if(e.continuousWorld||e.noWrap||(a=a.wrap(),r=r.wrap()),!e.bounds.intersects([a,r]))return!1}return!0},_removeOtherTiles:function(t){var e,i,n,o;for(o in this._tiles)e=o.split(":"),i=parseInt(e[0],10),n=parseInt(e[1],10),(i<t.min.x||i>t.max.x||n<t.min.y||n>t.max.y)&&this._removeTile(o)},_removeTile:function(t){var e=this._tiles[t];this.fire("tileunload",{tile:e,url:e.src}),this.options.reuseTiles?(o.DomUtil.removeClass(e,"leaflet-tile-loaded"),this._unusedTiles.push(e)):e.parentNode===this._tileContainer&&this._tileContainer.removeChild(e),o.Browser.android||(e.onload=null,e.src=o.Util.emptyImageUrl),delete this._tiles[t]},_addTile:function(t,e){var i=this._getTilePos(t),n=this._getTile();o.DomUtil.setPosition(n,i,o.Browser.chrome),this._tiles[t.x+":"+t.y]=n,this._loadTile(n,t),n.parentNode!==this._tileContainer&&e.appendChild(n)},_getZoomForUrl:function(){var t=this.options,e=this._map.getZoom();return t.zoomReverse&&(e=t.maxZoom-e),e+=t.zoomOffset,t.maxNativeZoom?Math.min(e,t.maxNativeZoom):e},_getTilePos:function(t){var e=this._map.getPixelOrigin(),i=this._getTileSize();return t.multiplyBy(i).subtract(e)},getTileUrl:function(t){return o.Util.template(this._url,o.extend({s:this._getSubdomain(t),z:t.z,x:t.x,y:t.y},this.options))},_getWrapTileNum:function(){var t=this._map.options.crs,e=t.getSize(this._map.getZoom());return e.divideBy(this._getTileSize())._floor()},_adjustTilePoint:function(t){var e=this._getWrapTileNum();this.options.continuousWorld||this.options.noWrap||(t.x=(t.x%e.x+e.x)%e.x),this.options.tms&&(t.y=e.y-t.y-1),t.z=this._getZoomForUrl()},_getSubdomain:function(t){var e=Math.abs(t.x+t.y)%this.options.subdomains.length;return this.options.subdomains[e]},_getTile:function(){if(this.options.reuseTiles&&this._unusedTiles.length>0){var t=this._unusedTiles.pop();return this._resetTile(t),t}return this._createTile()},_resetTile:function(){},_createTile:function(){var t=o.DomUtil.create("img","leaflet-tile");return t.style.width=t.style.height=this._getTileSize()+"px",t.galleryimg="no",t.onselectstart=t.onmousemove=o.Util.falseFn,o.Browser.ielt9&&this.options.opacity!==i&&o.DomUtil.setOpacity(t,this.options.opacity),o.Browser.mobileWebkit3d&&(t.style.WebkitBackfaceVisibility="hidden"),t},_loadTile:function(t,e){t._layer=this,t.onload=this._tileOnLoad,t.onerror=this._tileOnError,this._adjustTilePoint(e),t.src=this.getTileUrl(e),this.fire("tileloadstart",{tile:t,url:t.src})},_tileLoaded:function(){this._tilesToLoad--,this._animated&&o.DomUtil.addClass(this._tileContainer,"leaflet-zoom-animated"),this._tilesToLoad||(this.fire("load"),this._animated&&(clearTimeout(this._clearBgBufferTimer),this._clearBgBufferTimer=setTimeout(o.bind(this._clearBgBuffer,this),500)))},_tileOnLoad:function(){var t=this._layer;this.src!==o.Util.emptyImageUrl&&(o.DomUtil.addClass(this,"leaflet-tile-loaded"),t.fire("tileload",{tile:this,url:this.src})),t._tileLoaded()},_tileOnError:function(){var t=this._layer;t.fire("tileerror",{tile:this,url:this.src});var e=t.options.errorTileUrl;e&&(this.src=e),t._tileLoaded()}}),o.tileLayer=function(t,e){return new o.TileLayer(t,e)},o.TileLayer.WMS=o.TileLayer.extend({defaultWmsParams:{service:"WMS",request:"GetMap",version:"1.1.1",layers:"",styles:"",format:"image/jpeg",transparent:!1},initialize:function(t,e){this._url=t;var i=o.extend({},this.defaultWmsParams),n=e.tileSize||this.options.tileSize;i.width=i.height=e.detectRetina&&o.Browser.retina?2*n:n;for(var s in e)this.options.hasOwnProperty(s)||"crs"===s||(i[s]=e[s]);this.wmsParams=i,o.setOptions(this,e)},onAdd:function(t){this._crs=this.options.crs||t.options.crs,this._wmsVersion=parseFloat(this.wmsParams.version);var e=this._wmsVersion>=1.3?"crs":"srs";this.wmsParams[e]=this._crs.code,o.TileLayer.prototype.onAdd.call(this,t)},getTileUrl:function(t){var e=this._map,i=this.options.tileSize,n=t.multiplyBy(i),s=n.add([i,i]),a=this._crs.project(e.unproject(n,t.z)),r=this._crs.project(e.unproject(s,t.z)),h=this._wmsVersion>=1.3&&this._crs===o.CRS.EPSG4326?[r.y,a.x,a.y,r.x].join(","):[a.x,r.y,r.x,a.y].join(","),l=o.Util.template(this._url,{s:this._getSubdomain(t)});return l+o.Util.getParamString(this.wmsParams,l,!0)+"&BBOX="+h},setParams:function(t,e){return o.extend(this.wmsParams,t),e||this.redraw(),this}}),o.tileLayer.wms=function(t,e){return new o.TileLayer.WMS(t,e)},o.TileLayer.Canvas=o.TileLayer.extend({options:{async:!1},initialize:function(t){o.setOptions(this,t)},redraw:function(){this._map&&(this._reset({hard:!0}),this._update());for(var t in this._tiles)this._redrawTile(this._tiles[t]);return this},_redrawTile:function(t){this.drawTile(t,t._tilePoint,this._map._zoom)},_createTile:function(){var t=o.DomUtil.create("canvas","leaflet-tile");return t.width=t.height=this.options.tileSize,t.onselectstart=t.onmousemove=o.Util.falseFn,t},_loadTile:function(t,e){t._layer=this,t._tilePoint=e,this._redrawTile(t),this.options.async||this.tileDrawn(t)},drawTile:function(){},tileDrawn:function(t){this._tileOnLoad.call(t)}}),o.tileLayer.canvas=function(t){return new o.TileLayer.Canvas(t)},o.ImageOverlay=o.Class.extend({includes:o.Mixin.Events,options:{opacity:1},initialize:function(t,e,i){this._url=t,this._bounds=o.latLngBounds(e),o.setOptions(this,i)},onAdd:function(t){this._map=t,this._image||this._initImage(),t._panes.overlayPane.appendChild(this._image),t.on("viewreset",this._reset,this),t.options.zoomAnimation&&o.Browser.any3d&&t.on("zoomanim",this._animateZoom,this),this._reset()},onRemove:function(t){t.getPanes().overlayPane.removeChild(this._image),t.off("viewreset",this._reset,this),t.options.zoomAnimation&&t.off("zoomanim",this._animateZoom,this)},addTo:function(t){return t.addLayer(this),this},setOpacity:function(t){return this.options.opacity=t,this._updateOpacity(),this},bringToFront:function(){return this._image&&this._map._panes.overlayPane.appendChild(this._image),this},bringToBack:function(){var t=this._map._panes.overlayPane;return this._image&&t.insertBefore(this._image,t.firstChild),this},setUrl:function(t){this._url=t,this._image.src=this._url},getAttribution:function(){return this.options.attribution},_initImage:function(){this._image=o.DomUtil.create("img","leaflet-image-layer"),this._map.options.zoomAnimation&&o.Browser.any3d?o.DomUtil.addClass(this._image,"leaflet-zoom-animated"):o.DomUtil.addClass(this._image,"leaflet-zoom-hide"),this._updateOpacity(),o.extend(this._image,{galleryimg:"no",onselectstart:o.Util.falseFn,onmousemove:o.Util.falseFn,onload:o.bind(this._onImageLoad,this),src:this._url})},_animateZoom:function(t){var e=this._map,i=this._image,n=e.getZoomScale(t.zoom),s=this._bounds.getNorthWest(),a=this._bounds.getSouthEast(),r=e._latLngToNewLayerPoint(s,t.zoom,t.center),h=e._latLngToNewLayerPoint(a,t.zoom,t.center)._subtract(r),l=r._add(h._multiplyBy(.5*(1-1/n)));i.style[o.DomUtil.TRANSFORM]=o.DomUtil.getTranslateString(l)+" scale("+n+") "},_reset:function(){var t=this._image,e=this._map.latLngToLayerPoint(this._bounds.getNorthWest()),i=this._map.latLngToLayerPoint(this._bounds.getSouthEast())._subtract(e);o.DomUtil.setPosition(t,e),t.style.width=i.x+"px",t.style.height=i.y+"px"},_onImageLoad:function(){this.fire("load")},_updateOpacity:function(){o.DomUtil.setOpacity(this._image,this.options.opacity)}}),o.imageOverlay=function(t,e,i){return new o.ImageOverlay(t,e,i)},o.Icon=o.Class.extend({options:{className:""},initialize:function(t){o.setOptions(this,t)},createIcon:function(t){return this._createIcon("icon",t)},createShadow:function(t){return this._createIcon("shadow",t)},_createIcon:function(t,e){var i=this._getIconUrl(t);if(!i){if("icon"===t)throw new Error("iconUrl not set in Icon options (see the docs).");return null}var n;return n=e&&"IMG"===e.tagName?this._createImg(i,e):this._createImg(i),this._setIconStyles(n,t),n},_setIconStyles:function(t,e){var i,n=this.options,s=o.point(n[e+"Size"]);i=o.point("shadow"===e?n.shadowAnchor||n.iconAnchor:n.iconAnchor),!i&&s&&(i=s.divideBy(2,!0)),t.className="leaflet-marker-"+e+" "+n.className,i&&(t.style.marginLeft=-i.x+"px",t.style.marginTop=-i.y+"px"),s&&(t.style.width=s.x+"px",t.style.height=s.y+"px")},_createImg:function(t,i){return i=i||e.createElement("img"),i.src=t,i},_getIconUrl:function(t){return o.Browser.retina&&this.options[t+"RetinaUrl"]?this.options[t+"RetinaUrl"]:this.options[t+"Url"]}}),o.icon=function(t){return new o.Icon(t)},o.Icon.Default=o.Icon.extend({options:{iconSize:[25,41],iconAnchor:[12,41],popupAnchor:[1,-34],shadowSize:[41,41]},_getIconUrl:function(t){var e=t+"Url";if(this.options[e])return this.options[e];o.Browser.retina&&"icon"===t&&(t+="-2x");var i=o.Icon.Default.imagePath;if(!i)throw new Error("Couldn't autodetect L.Icon.Default.imagePath, set it manually.");return i+"/marker-"+t+".png"}}),o.Icon.Default.imagePath=function(){var t,i,n,o,s,a=e.getElementsByTagName("script"),r=/[\/^]leaflet[\-\._]?([\w\-\._]*)\.js\??/;for(t=0,i=a.length;i>t;t++)if(n=a[t].src,o=n.match(r))return s=n.split(r)[0],(s?s+"/":"")+"images"}(),o.Marker=o.Class.extend({includes:o.Mixin.Events,options:{icon:new o.Icon.Default,title:"",alt:"",clickable:!0,draggable:!1,keyboard:!0,zIndexOffset:0,opacity:1,riseOnHover:!1,riseOffset:250},initialize:function(t,e){o.setOptions(this,e),this._latlng=o.latLng(t)},onAdd:function(t){this._map=t,t.on("viewreset",this.update,this),this._initIcon(),this.update(),this.fire("add"),t.options.zoomAnimation&&t.options.markerZoomAnimation&&t.on("zoomanim",this._animateZoom,this)},addTo:function(t){return t.addLayer(this),this},onRemove:function(t){this.dragging&&this.dragging.disable(),this._removeIcon(),this._removeShadow(),this.fire("remove"),t.off({viewreset:this.update,zoomanim:this._animateZoom},this),this._map=null},getLatLng:function(){return this._latlng},setLatLng:function(t){return this._latlng=o.latLng(t),this.update(),this.fire("move",{latlng:this._latlng})},setZIndexOffset:function(t){return this.options.zIndexOffset=t,this.update(),this},setIcon:function(t){return this.options.icon=t,this._map&&(this._initIcon(),this.update()),this._popup&&this.bindPopup(this._popup),this},update:function(){if(this._icon){var t=this._map.latLngToLayerPoint(this._latlng).round();this._setPos(t)}return this},_initIcon:function(){var t=this.options,e=this._map,i=e.options.zoomAnimation&&e.options.markerZoomAnimation,n=i?"leaflet-zoom-animated":"leaflet-zoom-hide",s=t.icon.createIcon(this._icon),a=!1;s!==this._icon&&(this._icon&&this._removeIcon(),a=!0,t.title&&(s.title=t.title),t.alt&&(s.alt=t.alt)),o.DomUtil.addClass(s,n),t.keyboard&&(s.tabIndex="0"),this._icon=s,this._initInteraction(),t.riseOnHover&&o.DomEvent.on(s,"mouseover",this._bringToFront,this).on(s,"mouseout",this._resetZIndex,this);var r=t.icon.createShadow(this._shadow),h=!1;r!==this._shadow&&(this._removeShadow(),h=!0),r&&o.DomUtil.addClass(r,n),this._shadow=r,t.opacity<1&&this._updateOpacity();var l=this._map._panes;a&&l.markerPane.appendChild(this._icon),r&&h&&l.shadowPane.appendChild(this._shadow)},_removeIcon:function(){this.options.riseOnHover&&o.DomEvent.off(this._icon,"mouseover",this._bringToFront).off(this._icon,"mouseout",this._resetZIndex),this._map._panes.markerPane.removeChild(this._icon),this._icon=null},_removeShadow:function(){this._shadow&&this._map._panes.shadowPane.removeChild(this._shadow),this._shadow=null},_setPos:function(t){o.DomUtil.setPosition(this._icon,t),this._shadow&&o.DomUtil.setPosition(this._shadow,t),this._zIndex=t.y+this.options.zIndexOffset,this._resetZIndex()},_updateZIndex:function(t){this._icon.style.zIndex=this._zIndex+t},_animateZoom:function(t){var e=this._map._latLngToNewLayerPoint(this._latlng,t.zoom,t.center).round();this._setPos(e)},_initInteraction:function(){if(this.options.clickable){var t=this._icon,e=["dblclick","mousedown","mouseover","mouseout","contextmenu"];o.DomUtil.addClass(t,"leaflet-clickable"),o.DomEvent.on(t,"click",this._onMouseClick,this),o.DomEvent.on(t,"keypress",this._onKeyPress,this);for(var i=0;i<e.length;i++)o.DomEvent.on(t,e[i],this._fireMouseEvent,this);o.Handler.MarkerDrag&&(this.dragging=new o.Handler.MarkerDrag(this),this.options.draggable&&this.dragging.enable())}},_onMouseClick:function(t){var e=this.dragging&&this.dragging.moved();(this.hasEventListeners(t.type)||e)&&o.DomEvent.stopPropagation(t),e||(this.dragging&&this.dragging._enabled||!this._map.dragging||!this._map.dragging.moved())&&this.fire(t.type,{originalEvent:t,latlng:this._latlng})},_onKeyPress:function(t){13===t.keyCode&&this.fire("click",{originalEvent:t,latlng:this._latlng})},_fireMouseEvent:function(t){this.fire(t.type,{originalEvent:t,latlng:this._latlng}),"contextmenu"===t.type&&this.hasEventListeners(t.type)&&o.DomEvent.preventDefault(t),"mousedown"!==t.type?o.DomEvent.stopPropagation(t):o.DomEvent.preventDefault(t)},setOpacity:function(t){return this.options.opacity=t,this._map&&this._updateOpacity(),this},_updateOpacity:function(){o.DomUtil.setOpacity(this._icon,this.options.opacity),this._shadow&&o.DomUtil.setOpacity(this._shadow,this.options.opacity)},_bringToFront:function(){this._updateZIndex(this.options.riseOffset)},_resetZIndex:function(){this._updateZIndex(0)}}),o.marker=function(t,e){return new o.Marker(t,e)},o.DivIcon=o.Icon.extend({options:{iconSize:[12,12],className:"leaflet-div-icon",html:!1},createIcon:function(t){var i=t&&"DIV"===t.tagName?t:e.createElement("div"),n=this.options;return i.innerHTML=n.html!==!1?n.html:"",n.bgPos&&(i.style.backgroundPosition=-n.bgPos.x+"px "+-n.bgPos.y+"px"),this._setIconStyles(i,"icon"),i},createShadow:function(){return null}}),o.divIcon=function(t){return new o.DivIcon(t)},o.Map.mergeOptions({closePopupOnClick:!0}),o.Popup=o.Class.extend({includes:o.Mixin.Events,options:{minWidth:50,maxWidth:300,autoPan:!0,closeButton:!0,offset:[0,7],autoPanPadding:[5,5],keepInView:!1,className:"",zoomAnimation:!0},initialize:function(t,e){o.setOptions(this,t),this._source=e,this._animated=o.Browser.any3d&&this.options.zoomAnimation,this._isOpen=!1},onAdd:function(t){this._map=t,this._container||this._initLayout();var e=t.options.fadeAnimation;e&&o.DomUtil.setOpacity(this._container,0),t._panes.popupPane.appendChild(this._container),t.on(this._getEvents(),this),this.update(),e&&o.DomUtil.setOpacity(this._container,1),this.fire("open"),t.fire("popupopen",{popup:this}),this._source&&this._source.fire("popupopen",{popup:this})},addTo:function(t){return t.addLayer(this),this},openOn:function(t){return t.openPopup(this),this},onRemove:function(t){t._panes.popupPane.removeChild(this._container),o.Util.falseFn(this._container.offsetWidth),t.off(this._getEvents(),this),t.options.fadeAnimation&&o.DomUtil.setOpacity(this._container,0),this._map=null,this.fire("close"),t.fire("popupclose",{popup:this}),this._source&&this._source.fire("popupclose",{popup:this})},getLatLng:function(){return this._latlng},setLatLng:function(t){return this._latlng=o.latLng(t),this._map&&(this._updatePosition(),this._adjustPan()),this},getContent:function(){return this._content},setContent:function(t){return this._content=t,this.update(),this},update:function(){this._map&&(this._container.style.visibility="hidden",this._updateContent(),this._updateLayout(),this._updatePosition(),this._container.style.visibility="",this._adjustPan())},_getEvents:function(){var t={viewreset:this._updatePosition};return this._animated&&(t.zoomanim=this._zoomAnimation),("closeOnClick"in this.options?this.options.closeOnClick:this._map.options.closePopupOnClick)&&(t.preclick=this._close),this.options.keepInView&&(t.moveend=this._adjustPan),t},_close:function(){this._map&&this._map.closePopup(this)},_initLayout:function(){var t,e="leaflet-popup",i=e+" "+this.options.className+" leaflet-zoom-"+(this._animated?"animated":"hide"),n=this._container=o.DomUtil.create("div",i);this.options.closeButton&&(t=this._closeButton=o.DomUtil.create("a",e+"-close-button",n),t.href="#close",t.innerHTML="&#215;",o.DomEvent.disableClickPropagation(t),o.DomEvent.on(t,"click",this._onCloseButtonClick,this));var s=this._wrapper=o.DomUtil.create("div",e+"-content-wrapper",n);o.DomEvent.disableClickPropagation(s),this._contentNode=o.DomUtil.create("div",e+"-content",s),o.DomEvent.disableScrollPropagation(this._contentNode),o.DomEvent.on(s,"contextmenu",o.DomEvent.stopPropagation),this._tipContainer=o.DomUtil.create("div",e+"-tip-container",n),this._tip=o.DomUtil.create("div",e+"-tip",this._tipContainer)},_updateContent:function(){if(this._content){if("string"==typeof this._content)this._contentNode.innerHTML=this._content;else{for(;this._contentNode.hasChildNodes();)this._contentNode.removeChild(this._contentNode.firstChild);this._contentNode.appendChild(this._content)}this.fire("contentupdate")}},_updateLayout:function(){var t=this._contentNode,e=t.style;e.width="",e.whiteSpace="nowrap";var i=t.offsetWidth;i=Math.min(i,this.options.maxWidth),i=Math.max(i,this.options.minWidth),e.width=i+1+"px",e.whiteSpace="",e.height="";var n=t.offsetHeight,s=this.options.maxHeight,a="leaflet-popup-scrolled";s&&n>s?(e.height=s+"px",o.DomUtil.addClass(t,a)):o.DomUtil.removeClass(t,a),this._containerWidth=this._container.offsetWidth},_updatePosition:function(){if(this._map){var t=this._map.latLngToLayerPoint(this._latlng),e=this._animated,i=o.point(this.options.offset);e&&o.DomUtil.setPosition(this._container,t),this._containerBottom=-i.y-(e?0:t.y),this._containerLeft=-Math.round(this._containerWidth/2)+i.x+(e?0:t.x),this._container.style.bottom=this._containerBottom+"px",this._container.style.left=this._containerLeft+"px"}},_zoomAnimation:function(t){var e=this._map._latLngToNewLayerPoint(this._latlng,t.zoom,t.center);o.DomUtil.setPosition(this._container,e)},_adjustPan:function(){if(this.options.autoPan){var t=this._map,e=this._container.offsetHeight,i=this._containerWidth,n=new o.Point(this._containerLeft,-e-this._containerBottom);this._animated&&n._add(o.DomUtil.getPosition(this._container));var s=t.layerPointToContainerPoint(n),a=o.point(this.options.autoPanPadding),r=o.point(this.options.autoPanPaddingTopLeft||a),h=o.point(this.options.autoPanPaddingBottomRight||a),l=t.getSize(),u=0,c=0;s.x+i+h.x>l.x&&(u=s.x+i-l.x+h.x),s.x-u-r.x<0&&(u=s.x-r.x),s.y+e+h.y>l.y&&(c=s.y+e-l.y+h.y),s.y-c-r.y<0&&(c=s.y-r.y),(u||c)&&t.fire("autopanstart").panBy([u,c])}},_onCloseButtonClick:function(t){this._close(),o.DomEvent.stop(t)}}),o.popup=function(t,e){return new o.Popup(t,e)},o.Map.include({openPopup:function(t,e,i){if(this.closePopup(),!(t instanceof o.Popup)){var n=t;t=new o.Popup(i).setLatLng(e).setContent(n)}return t._isOpen=!0,this._popup=t,this.addLayer(t)},closePopup:function(t){return t&&t!==this._popup||(t=this._popup,this._popup=null),t&&(this.removeLayer(t),t._isOpen=!1),this}}),o.Marker.include({openPopup:function(){return this._popup&&this._map&&!this._map.hasLayer(this._popup)&&(this._popup.setLatLng(this._latlng),this._map.openPopup(this._popup)),this},closePopup:function(){return this._popup&&this._popup._close(),this},togglePopup:function(){return this._popup&&(this._popup._isOpen?this.closePopup():this.openPopup()),this},bindPopup:function(t,e){var i=o.point(this.options.icon.options.popupAnchor||[0,0]);return i=i.add(o.Popup.prototype.options.offset),e&&e.offset&&(i=i.add(e.offset)),e=o.extend({offset:i},e),this._popupHandlersAdded||(this.on("click",this.togglePopup,this).on("remove",this.closePopup,this).on("move",this._movePopup,this),this._popupHandlersAdded=!0),t instanceof o.Popup?(o.setOptions(t,e),this._popup=t):this._popup=new o.Popup(e,this).setContent(t),this},setPopupContent:function(t){return this._popup&&this._popup.setContent(t),this},unbindPopup:function(){return this._popup&&(this._popup=null,this.off("click",this.togglePopup,this).off("remove",this.closePopup,this).off("move",this._movePopup,this),this._popupHandlersAdded=!1),this},getPopup:function(){return this._popup},_movePopup:function(t){this._popup.setLatLng(t.latlng)}}),o.LayerGroup=o.Class.extend({initialize:function(t){this._layers={};var e,i;if(t)for(e=0,i=t.length;i>e;e++)this.addLayer(t[e])},addLayer:function(t){var e=this.getLayerId(t);return this._layers[e]=t,this._map&&this._map.addLayer(t),this},removeLayer:function(t){var e=t in this._layers?t:this.getLayerId(t);return this._map&&this._layers[e]&&this._map.removeLayer(this._layers[e]),delete this._layers[e],this},hasLayer:function(t){return t?t in this._layers||this.getLayerId(t)in this._layers:!1},clearLayers:function(){return this.eachLayer(this.removeLayer,this),this},invoke:function(t){var e,i,n=Array.prototype.slice.call(arguments,1);for(e in this._layers)i=this._layers[e],i[t]&&i[t].apply(i,n);return this},onAdd:function(t){this._map=t,this.eachLayer(t.addLayer,t)},onRemove:function(t){this.eachLayer(t.removeLayer,t),this._map=null},addTo:function(t){return t.addLayer(this),this},eachLayer:function(t,e){for(var i in this._layers)t.call(e,this._layers[i]);return this},getLayer:function(t){return this._layers[t]},getLayers:function(){var t=[];for(var e in this._layers)t.push(this._layers[e]);return t},setZIndex:function(t){return this.invoke("setZIndex",t)},getLayerId:function(t){return o.stamp(t)}}),o.layerGroup=function(t){return new o.LayerGroup(t)},o.FeatureGroup=o.LayerGroup.extend({includes:o.Mixin.Events,statics:{EVENTS:"click dblclick mouseover mouseout mousemove contextmenu popupopen popupclose"},addLayer:function(t){return this.hasLayer(t)?this:("on"in t&&t.on(o.FeatureGroup.EVENTS,this._propagateEvent,this),o.LayerGroup.prototype.addLayer.call(this,t),this._popupContent&&t.bindPopup&&t.bindPopup(this._popupContent,this._popupOptions),this.fire("layeradd",{layer:t}))},removeLayer:function(t){return this.hasLayer(t)?(t in this._layers&&(t=this._layers[t]),t.off(o.FeatureGroup.EVENTS,this._propagateEvent,this),o.LayerGroup.prototype.removeLayer.call(this,t),this._popupContent&&this.invoke("unbindPopup"),this.fire("layerremove",{layer:t})):this},bindPopup:function(t,e){return this._popupContent=t,this._popupOptions=e,this.invoke("bindPopup",t,e)},openPopup:function(t){for(var e in this._layers){this._layers[e].openPopup(t);break}return this},setStyle:function(t){return this.invoke("setStyle",t)},bringToFront:function(){return this.invoke("bringToFront")},bringToBack:function(){return this.invoke("bringToBack")},getBounds:function(){var t=new o.LatLngBounds;return this.eachLayer(function(e){t.extend(e instanceof o.Marker?e.getLatLng():e.getBounds())}),t},_propagateEvent:function(t){t=o.extend({layer:t.target,target:this},t),this.fire(t.type,t)}}),o.featureGroup=function(t){return new o.FeatureGroup(t)},o.Path=o.Class.extend({includes:[o.Mixin.Events],statics:{CLIP_PADDING:function(){var e=o.Browser.mobile?1280:2e3,i=(e/Math.max(t.outerWidth,t.outerHeight)-1)/2;return Math.max(0,Math.min(.5,i))}()},options:{stroke:!0,color:"#0033ff",dashArray:null,lineCap:null,lineJoin:null,weight:5,opacity:.5,fill:!1,fillColor:null,fillOpacity:.2,clickable:!0},initialize:function(t){o.setOptions(this,t)},onAdd:function(t){this._map=t,this._container||(this._initElements(),this._initEvents()),this.projectLatlngs(),this._updatePath(),this._container&&this._map._pathRoot.appendChild(this._container),this.fire("add"),t.on({viewreset:this.projectLatlngs,moveend:this._updatePath},this)},addTo:function(t){return t.addLayer(this),this},onRemove:function(t){t._pathRoot.removeChild(this._container),this.fire("remove"),this._map=null,o.Browser.vml&&(this._container=null,this._stroke=null,this._fill=null),t.off({viewreset:this.projectLatlngs,moveend:this._updatePath},this)},projectLatlngs:function(){},setStyle:function(t){return o.setOptions(this,t),this._container&&this._updateStyle(),this},redraw:function(){return this._map&&(this.projectLatlngs(),this._updatePath()),this}}),o.Map.include({_updatePathViewport:function(){var t=o.Path.CLIP_PADDING,e=this.getSize(),i=o.DomUtil.getPosition(this._mapPane),n=i.multiplyBy(-1)._subtract(e.multiplyBy(t)._round()),s=n.add(e.multiplyBy(1+2*t)._round());this._pathViewport=new o.Bounds(n,s)}}),o.Path.SVG_NS="http://www.w3.org/2000/svg",o.Browser.svg=!(!e.createElementNS||!e.createElementNS(o.Path.SVG_NS,"svg").createSVGRect),o.Path=o.Path.extend({statics:{SVG:o.Browser.svg},bringToFront:function(){var t=this._map._pathRoot,e=this._container;return e&&t.lastChild!==e&&t.appendChild(e),this},bringToBack:function(){var t=this._map._pathRoot,e=this._container,i=t.firstChild;return e&&i!==e&&t.insertBefore(e,i),this},getPathString:function(){},_createElement:function(t){return e.createElementNS(o.Path.SVG_NS,t)},_initElements:function(){this._map._initPathRoot(),this._initPath(),this._initStyle()},_initPath:function(){this._container=this._createElement("g"),this._path=this._createElement("path"),this.options.className&&o.DomUtil.addClass(this._path,this.options.className),this._container.appendChild(this._path)},_initStyle:function(){this.options.stroke&&(this._path.setAttribute("stroke-linejoin","round"),this._path.setAttribute("stroke-linecap","round")),this.options.fill&&this._path.setAttribute("fill-rule","evenodd"),this.options.pointerEvents&&this._path.setAttribute("pointer-events",this.options.pointerEvents),this.options.clickable||this.options.pointerEvents||this._path.setAttribute("pointer-events","none"),this._updateStyle()},_updateStyle:function(){this.options.stroke?(this._path.setAttribute("stroke",this.options.color),this._path.setAttribute("stroke-opacity",this.options.opacity),this._path.setAttribute("stroke-width",this.options.weight),this.options.dashArray?this._path.setAttribute("stroke-dasharray",this.options.dashArray):this._path.removeAttribute("stroke-dasharray"),this.options.lineCap&&this._path.setAttribute("stroke-linecap",this.options.lineCap),this.options.lineJoin&&this._path.setAttribute("stroke-linejoin",this.options.lineJoin)):this._path.setAttribute("stroke","none"),this.options.fill?(this._path.setAttribute("fill",this.options.fillColor||this.options.color),this._path.setAttribute("fill-opacity",this.options.fillOpacity)):this._path.setAttribute("fill","none")},_updatePath:function(){var t=this.getPathString();t||(t="M0 0"),this._path.setAttribute("d",t)},_initEvents:function(){if(this.options.clickable){(o.Browser.svg||!o.Browser.vml)&&o.DomUtil.addClass(this._path,"leaflet-clickable"),o.DomEvent.on(this._container,"click",this._onMouseClick,this);for(var t=["dblclick","mousedown","mouseover","mouseout","mousemove","contextmenu"],e=0;e<t.length;e++)o.DomEvent.on(this._container,t[e],this._fireMouseEvent,this)}},_onMouseClick:function(t){this._map.dragging&&this._map.dragging.moved()||this._fireMouseEvent(t)},_fireMouseEvent:function(t){if(this.hasEventListeners(t.type)){var e=this._map,i=e.mouseEventToContainerPoint(t),n=e.containerPointToLayerPoint(i),s=e.layerPointToLatLng(n);this.fire(t.type,{latlng:s,layerPoint:n,containerPoint:i,originalEvent:t}),"contextmenu"===t.type&&o.DomEvent.preventDefault(t),"mousemove"!==t.type&&o.DomEvent.stopPropagation(t)}}}),o.Map.include({_initPathRoot:function(){this._pathRoot||(this._pathRoot=o.Path.prototype._createElement("svg"),this._panes.overlayPane.appendChild(this._pathRoot),this.options.zoomAnimation&&o.Browser.any3d?(o.DomUtil.addClass(this._pathRoot,"leaflet-zoom-animated"),this.on({zoomanim:this._animatePathZoom,zoomend:this._endPathZoom})):o.DomUtil.addClass(this._pathRoot,"leaflet-zoom-hide"),this.on("moveend",this._updateSvgViewport),this._updateSvgViewport())
 },_animatePathZoom:function(t){var e=this.getZoomScale(t.zoom),i=this._getCenterOffset(t.center)._multiplyBy(-e)._add(this._pathViewport.min);this._pathRoot.style[o.DomUtil.TRANSFORM]=o.DomUtil.getTranslateString(i)+" scale("+e+") ",this._pathZooming=!0},_endPathZoom:function(){this._pathZooming=!1},_updateSvgViewport:function(){if(!this._pathZooming){this._updatePathViewport();var t=this._pathViewport,e=t.min,i=t.max,n=i.x-e.x,s=i.y-e.y,a=this._pathRoot,r=this._panes.overlayPane;o.Browser.mobileWebkit&&r.removeChild(a),o.DomUtil.setPosition(a,e),a.setAttribute("width",n),a.setAttribute("height",s),a.setAttribute("viewBox",[e.x,e.y,n,s].join(" ")),o.Browser.mobileWebkit&&r.appendChild(a)}}}),o.Path.include({bindPopup:function(t,e){return t instanceof o.Popup?this._popup=t:((!this._popup||e)&&(this._popup=new o.Popup(e,this)),this._popup.setContent(t)),this._popupHandlersAdded||(this.on("click",this._openPopup,this).on("remove",this.closePopup,this),this._popupHandlersAdded=!0),this},unbindPopup:function(){return this._popup&&(this._popup=null,this.off("click",this._openPopup).off("remove",this.closePopup),this._popupHandlersAdded=!1),this},openPopup:function(t){return this._popup&&(t=t||this._latlng||this._latlngs[Math.floor(this._latlngs.length/2)],this._openPopup({latlng:t})),this},closePopup:function(){return this._popup&&this._popup._close(),this},_openPopup:function(t){this._popup.setLatLng(t.latlng),this._map.openPopup(this._popup)}}),o.Browser.vml=!o.Browser.svg&&function(){try{var t=e.createElement("div");t.innerHTML='<v:shape adj="1"/>';var i=t.firstChild;return i.style.behavior="url(#default#VML)",i&&"object"==typeof i.adj}catch(n){return!1}}(),o.Path=o.Browser.svg||!o.Browser.vml?o.Path:o.Path.extend({statics:{VML:!0,CLIP_PADDING:.02},_createElement:function(){try{return e.namespaces.add("lvml","urn:schemas-microsoft-com:vml"),function(t){return e.createElement("<lvml:"+t+' class="lvml">')}}catch(t){return function(t){return e.createElement("<"+t+' xmlns="urn:schemas-microsoft.com:vml" class="lvml">')}}}(),_initPath:function(){var t=this._container=this._createElement("shape");o.DomUtil.addClass(t,"leaflet-vml-shape"+(this.options.className?" "+this.options.className:"")),this.options.clickable&&o.DomUtil.addClass(t,"leaflet-clickable"),t.coordsize="1 1",this._path=this._createElement("path"),t.appendChild(this._path),this._map._pathRoot.appendChild(t)},_initStyle:function(){this._updateStyle()},_updateStyle:function(){var t=this._stroke,e=this._fill,i=this.options,n=this._container;n.stroked=i.stroke,n.filled=i.fill,i.stroke?(t||(t=this._stroke=this._createElement("stroke"),t.endcap="round",n.appendChild(t)),t.weight=i.weight+"px",t.color=i.color,t.opacity=i.opacity,t.dashStyle=i.dashArray?o.Util.isArray(i.dashArray)?i.dashArray.join(" "):i.dashArray.replace(/( *, *)/g," "):"",i.lineCap&&(t.endcap=i.lineCap.replace("butt","flat")),i.lineJoin&&(t.joinstyle=i.lineJoin)):t&&(n.removeChild(t),this._stroke=null),i.fill?(e||(e=this._fill=this._createElement("fill"),n.appendChild(e)),e.color=i.fillColor||i.color,e.opacity=i.fillOpacity):e&&(n.removeChild(e),this._fill=null)},_updatePath:function(){var t=this._container.style;t.display="none",this._path.v=this.getPathString()+" ",t.display=""}}),o.Map.include(o.Browser.svg||!o.Browser.vml?{}:{_initPathRoot:function(){if(!this._pathRoot){var t=this._pathRoot=e.createElement("div");t.className="leaflet-vml-container",this._panes.overlayPane.appendChild(t),this.on("moveend",this._updatePathViewport),this._updatePathViewport()}}}),o.Browser.canvas=function(){return!!e.createElement("canvas").getContext}(),o.Path=o.Path.SVG&&!t.L_PREFER_CANVAS||!o.Browser.canvas?o.Path:o.Path.extend({statics:{CANVAS:!0,SVG:!1},redraw:function(){return this._map&&(this.projectLatlngs(),this._requestUpdate()),this},setStyle:function(t){return o.setOptions(this,t),this._map&&(this._updateStyle(),this._requestUpdate()),this},onRemove:function(t){t.off("viewreset",this.projectLatlngs,this).off("moveend",this._updatePath,this),this.options.clickable&&(this._map.off("click",this._onClick,this),this._map.off("mousemove",this._onMouseMove,this)),this._requestUpdate(),this.fire("remove"),this._map=null},_requestUpdate:function(){this._map&&!o.Path._updateRequest&&(o.Path._updateRequest=o.Util.requestAnimFrame(this._fireMapMoveEnd,this._map))},_fireMapMoveEnd:function(){o.Path._updateRequest=null,this.fire("moveend")},_initElements:function(){this._map._initPathRoot(),this._ctx=this._map._canvasCtx},_updateStyle:function(){var t=this.options;t.stroke&&(this._ctx.lineWidth=t.weight,this._ctx.strokeStyle=t.color),t.fill&&(this._ctx.fillStyle=t.fillColor||t.color)},_drawPath:function(){var t,e,i,n,s,a;for(this._ctx.beginPath(),t=0,i=this._parts.length;i>t;t++){for(e=0,n=this._parts[t].length;n>e;e++)s=this._parts[t][e],a=(0===e?"move":"line")+"To",this._ctx[a](s.x,s.y);this instanceof o.Polygon&&this._ctx.closePath()}},_checkIfEmpty:function(){return!this._parts.length},_updatePath:function(){if(!this._checkIfEmpty()){var t=this._ctx,e=this.options;this._drawPath(),t.save(),this._updateStyle(),e.fill&&(t.globalAlpha=e.fillOpacity,t.fill()),e.stroke&&(t.globalAlpha=e.opacity,t.stroke()),t.restore()}},_initEvents:function(){this.options.clickable&&(this._map.on("mousemove",this._onMouseMove,this),this._map.on("click",this._onClick,this))},_onClick:function(t){this._containsPoint(t.layerPoint)&&this.fire("click",t)},_onMouseMove:function(t){this._map&&!this._map._animatingZoom&&(this._containsPoint(t.layerPoint)?(this._ctx.canvas.style.cursor="pointer",this._mouseInside=!0,this.fire("mouseover",t)):this._mouseInside&&(this._ctx.canvas.style.cursor="",this._mouseInside=!1,this.fire("mouseout",t)))}}),o.Map.include(o.Path.SVG&&!t.L_PREFER_CANVAS||!o.Browser.canvas?{}:{_initPathRoot:function(){var t,i=this._pathRoot;i||(i=this._pathRoot=e.createElement("canvas"),i.style.position="absolute",t=this._canvasCtx=i.getContext("2d"),t.lineCap="round",t.lineJoin="round",this._panes.overlayPane.appendChild(i),this.options.zoomAnimation&&(this._pathRoot.className="leaflet-zoom-animated",this.on("zoomanim",this._animatePathZoom),this.on("zoomend",this._endPathZoom)),this.on("moveend",this._updateCanvasViewport),this._updateCanvasViewport())},_updateCanvasViewport:function(){if(!this._pathZooming){this._updatePathViewport();var t=this._pathViewport,e=t.min,i=t.max.subtract(e),n=this._pathRoot;o.DomUtil.setPosition(n,e),n.width=i.x,n.height=i.y,n.getContext("2d").translate(-e.x,-e.y)}}}),o.LineUtil={simplify:function(t,e){if(!e||!t.length)return t.slice();var i=e*e;return t=this._reducePoints(t,i),t=this._simplifyDP(t,i)},pointToSegmentDistance:function(t,e,i){return Math.sqrt(this._sqClosestPointOnSegment(t,e,i,!0))},closestPointOnSegment:function(t,e,i){return this._sqClosestPointOnSegment(t,e,i)},_simplifyDP:function(t,e){var n=t.length,o=typeof Uint8Array!=i+""?Uint8Array:Array,s=new o(n);s[0]=s[n-1]=1,this._simplifyDPStep(t,s,e,0,n-1);var a,r=[];for(a=0;n>a;a++)s[a]&&r.push(t[a]);return r},_simplifyDPStep:function(t,e,i,n,o){var s,a,r,h=0;for(a=n+1;o-1>=a;a++)r=this._sqClosestPointOnSegment(t[a],t[n],t[o],!0),r>h&&(s=a,h=r);h>i&&(e[s]=1,this._simplifyDPStep(t,e,i,n,s),this._simplifyDPStep(t,e,i,s,o))},_reducePoints:function(t,e){for(var i=[t[0]],n=1,o=0,s=t.length;s>n;n++)this._sqDist(t[n],t[o])>e&&(i.push(t[n]),o=n);return s-1>o&&i.push(t[s-1]),i},clipSegment:function(t,e,i,n){var o,s,a,r=n?this._lastCode:this._getBitCode(t,i),h=this._getBitCode(e,i);for(this._lastCode=h;;){if(!(r|h))return[t,e];if(r&h)return!1;o=r||h,s=this._getEdgeIntersection(t,e,o,i),a=this._getBitCode(s,i),o===r?(t=s,r=a):(e=s,h=a)}},_getEdgeIntersection:function(t,e,i,n){var s=e.x-t.x,a=e.y-t.y,r=n.min,h=n.max;return 8&i?new o.Point(t.x+s*(h.y-t.y)/a,h.y):4&i?new o.Point(t.x+s*(r.y-t.y)/a,r.y):2&i?new o.Point(h.x,t.y+a*(h.x-t.x)/s):1&i?new o.Point(r.x,t.y+a*(r.x-t.x)/s):void 0},_getBitCode:function(t,e){var i=0;return t.x<e.min.x?i|=1:t.x>e.max.x&&(i|=2),t.y<e.min.y?i|=4:t.y>e.max.y&&(i|=8),i},_sqDist:function(t,e){var i=e.x-t.x,n=e.y-t.y;return i*i+n*n},_sqClosestPointOnSegment:function(t,e,i,n){var s,a=e.x,r=e.y,h=i.x-a,l=i.y-r,u=h*h+l*l;return u>0&&(s=((t.x-a)*h+(t.y-r)*l)/u,s>1?(a=i.x,r=i.y):s>0&&(a+=h*s,r+=l*s)),h=t.x-a,l=t.y-r,n?h*h+l*l:new o.Point(a,r)}},o.Polyline=o.Path.extend({initialize:function(t,e){o.Path.prototype.initialize.call(this,e),this._latlngs=this._convertLatLngs(t)},options:{smoothFactor:1,noClip:!1},projectLatlngs:function(){this._originalPoints=[];for(var t=0,e=this._latlngs.length;e>t;t++)this._originalPoints[t]=this._map.latLngToLayerPoint(this._latlngs[t])},getPathString:function(){for(var t=0,e=this._parts.length,i="";e>t;t++)i+=this._getPathPartStr(this._parts[t]);return i},getLatLngs:function(){return this._latlngs},setLatLngs:function(t){return this._latlngs=this._convertLatLngs(t),this.redraw()},addLatLng:function(t){return this._latlngs.push(o.latLng(t)),this.redraw()},spliceLatLngs:function(){var t=[].splice.apply(this._latlngs,arguments);return this._convertLatLngs(this._latlngs,!0),this.redraw(),t},closestLayerPoint:function(t){for(var e,i,n=1/0,s=this._parts,a=null,r=0,h=s.length;h>r;r++)for(var l=s[r],u=1,c=l.length;c>u;u++){e=l[u-1],i=l[u];var d=o.LineUtil._sqClosestPointOnSegment(t,e,i,!0);n>d&&(n=d,a=o.LineUtil._sqClosestPointOnSegment(t,e,i))}return a&&(a.distance=Math.sqrt(n)),a},getBounds:function(){return new o.LatLngBounds(this.getLatLngs())},_convertLatLngs:function(t,e){var i,n,s=e?t:[];for(i=0,n=t.length;n>i;i++){if(o.Util.isArray(t[i])&&"number"!=typeof t[i][0])return;s[i]=o.latLng(t[i])}return s},_initEvents:function(){o.Path.prototype._initEvents.call(this)},_getPathPartStr:function(t){for(var e,i=o.Path.VML,n=0,s=t.length,a="";s>n;n++)e=t[n],i&&e._round(),a+=(n?"L":"M")+e.x+" "+e.y;return a},_clipPoints:function(){var t,e,i,n=this._originalPoints,s=n.length;if(this.options.noClip)return void(this._parts=[n]);this._parts=[];var a=this._parts,r=this._map._pathViewport,h=o.LineUtil;for(t=0,e=0;s-1>t;t++)i=h.clipSegment(n[t],n[t+1],r,t),i&&(a[e]=a[e]||[],a[e].push(i[0]),(i[1]!==n[t+1]||t===s-2)&&(a[e].push(i[1]),e++))},_simplifyPoints:function(){for(var t=this._parts,e=o.LineUtil,i=0,n=t.length;n>i;i++)t[i]=e.simplify(t[i],this.options.smoothFactor)},_updatePath:function(){this._map&&(this._clipPoints(),this._simplifyPoints(),o.Path.prototype._updatePath.call(this))}}),o.polyline=function(t,e){return new o.Polyline(t,e)},o.PolyUtil={},o.PolyUtil.clipPolygon=function(t,e){var i,n,s,a,r,h,l,u,c,d=[1,4,2,8],p=o.LineUtil;for(n=0,l=t.length;l>n;n++)t[n]._code=p._getBitCode(t[n],e);for(a=0;4>a;a++){for(u=d[a],i=[],n=0,l=t.length,s=l-1;l>n;s=n++)r=t[n],h=t[s],r._code&u?h._code&u||(c=p._getEdgeIntersection(h,r,u,e),c._code=p._getBitCode(c,e),i.push(c)):(h._code&u&&(c=p._getEdgeIntersection(h,r,u,e),c._code=p._getBitCode(c,e),i.push(c)),i.push(r));t=i}return t},o.Polygon=o.Polyline.extend({options:{fill:!0},initialize:function(t,e){o.Polyline.prototype.initialize.call(this,t,e),this._initWithHoles(t)},_initWithHoles:function(t){var e,i,n;if(t&&o.Util.isArray(t[0])&&"number"!=typeof t[0][0])for(this._latlngs=this._convertLatLngs(t[0]),this._holes=t.slice(1),e=0,i=this._holes.length;i>e;e++)n=this._holes[e]=this._convertLatLngs(this._holes[e]),n[0].equals(n[n.length-1])&&n.pop();t=this._latlngs,t.length>=2&&t[0].equals(t[t.length-1])&&t.pop()},projectLatlngs:function(){if(o.Polyline.prototype.projectLatlngs.call(this),this._holePoints=[],this._holes){var t,e,i,n;for(t=0,i=this._holes.length;i>t;t++)for(this._holePoints[t]=[],e=0,n=this._holes[t].length;n>e;e++)this._holePoints[t][e]=this._map.latLngToLayerPoint(this._holes[t][e])}},setLatLngs:function(t){return t&&o.Util.isArray(t[0])&&"number"!=typeof t[0][0]?(this._initWithHoles(t),this.redraw()):o.Polyline.prototype.setLatLngs.call(this,t)},_clipPoints:function(){var t=this._originalPoints,e=[];if(this._parts=[t].concat(this._holePoints),!this.options.noClip){for(var i=0,n=this._parts.length;n>i;i++){var s=o.PolyUtil.clipPolygon(this._parts[i],this._map._pathViewport);s.length&&e.push(s)}this._parts=e}},_getPathPartStr:function(t){var e=o.Polyline.prototype._getPathPartStr.call(this,t);return e+(o.Browser.svg?"z":"x")}}),o.polygon=function(t,e){return new o.Polygon(t,e)},function(){function t(t){return o.FeatureGroup.extend({initialize:function(t,e){this._layers={},this._options=e,this.setLatLngs(t)},setLatLngs:function(e){var i=0,n=e.length;for(this.eachLayer(function(t){n>i?t.setLatLngs(e[i++]):this.removeLayer(t)},this);n>i;)this.addLayer(new t(e[i++],this._options));return this},getLatLngs:function(){var t=[];return this.eachLayer(function(e){t.push(e.getLatLngs())}),t}})}o.MultiPolyline=t(o.Polyline),o.MultiPolygon=t(o.Polygon),o.multiPolyline=function(t,e){return new o.MultiPolyline(t,e)},o.multiPolygon=function(t,e){return new o.MultiPolygon(t,e)}}(),o.Rectangle=o.Polygon.extend({initialize:function(t,e){o.Polygon.prototype.initialize.call(this,this._boundsToLatLngs(t),e)},setBounds:function(t){this.setLatLngs(this._boundsToLatLngs(t))},_boundsToLatLngs:function(t){return t=o.latLngBounds(t),[t.getSouthWest(),t.getNorthWest(),t.getNorthEast(),t.getSouthEast()]}}),o.rectangle=function(t,e){return new o.Rectangle(t,e)},o.Circle=o.Path.extend({initialize:function(t,e,i){o.Path.prototype.initialize.call(this,i),this._latlng=o.latLng(t),this._mRadius=e},options:{fill:!0},setLatLng:function(t){return this._latlng=o.latLng(t),this.redraw()},setRadius:function(t){return this._mRadius=t,this.redraw()},projectLatlngs:function(){var t=this._getLngRadius(),e=this._latlng,i=this._map.latLngToLayerPoint([e.lat,e.lng-t]);this._point=this._map.latLngToLayerPoint(e),this._radius=Math.max(this._point.x-i.x,1)},getBounds:function(){var t=this._getLngRadius(),e=this._mRadius/40075017*360,i=this._latlng;return new o.LatLngBounds([i.lat-e,i.lng-t],[i.lat+e,i.lng+t])},getLatLng:function(){return this._latlng},getPathString:function(){var t=this._point,e=this._radius;return this._checkIfEmpty()?"":o.Browser.svg?"M"+t.x+","+(t.y-e)+"A"+e+","+e+",0,1,1,"+(t.x-.1)+","+(t.y-e)+" z":(t._round(),e=Math.round(e),"AL "+t.x+","+t.y+" "+e+","+e+" 0,23592600")},getRadius:function(){return this._mRadius},_getLatRadius:function(){return this._mRadius/40075017*360},_getLngRadius:function(){return this._getLatRadius()/Math.cos(o.LatLng.DEG_TO_RAD*this._latlng.lat)},_checkIfEmpty:function(){if(!this._map)return!1;var t=this._map._pathViewport,e=this._radius,i=this._point;return i.x-e>t.max.x||i.y-e>t.max.y||i.x+e<t.min.x||i.y+e<t.min.y}}),o.circle=function(t,e,i){return new o.Circle(t,e,i)},o.CircleMarker=o.Circle.extend({options:{radius:10,weight:2},initialize:function(t,e){o.Circle.prototype.initialize.call(this,t,null,e),this._radius=this.options.radius},projectLatlngs:function(){this._point=this._map.latLngToLayerPoint(this._latlng)},_updateStyle:function(){o.Circle.prototype._updateStyle.call(this),this.setRadius(this.options.radius)},setLatLng:function(t){return o.Circle.prototype.setLatLng.call(this,t),this._popup&&this._popup._isOpen&&this._popup.setLatLng(t),this},setRadius:function(t){return this.options.radius=this._radius=t,this.redraw()},getRadius:function(){return this._radius}}),o.circleMarker=function(t,e){return new o.CircleMarker(t,e)},o.Polyline.include(o.Path.CANVAS?{_containsPoint:function(t,e){var i,n,s,a,r,h,l,u=this.options.weight/2;for(o.Browser.touch&&(u+=10),i=0,a=this._parts.length;a>i;i++)for(l=this._parts[i],n=0,r=l.length,s=r-1;r>n;s=n++)if((e||0!==n)&&(h=o.LineUtil.pointToSegmentDistance(t,l[s],l[n]),u>=h))return!0;return!1}}:{}),o.Polygon.include(o.Path.CANVAS?{_containsPoint:function(t){var e,i,n,s,a,r,h,l,u=!1;if(o.Polyline.prototype._containsPoint.call(this,t,!0))return!0;for(s=0,h=this._parts.length;h>s;s++)for(e=this._parts[s],a=0,l=e.length,r=l-1;l>a;r=a++)i=e[a],n=e[r],i.y>t.y!=n.y>t.y&&t.x<(n.x-i.x)*(t.y-i.y)/(n.y-i.y)+i.x&&(u=!u);return u}}:{}),o.Circle.include(o.Path.CANVAS?{_drawPath:function(){var t=this._point;this._ctx.beginPath(),this._ctx.arc(t.x,t.y,this._radius,0,2*Math.PI,!1)},_containsPoint:function(t){var e=this._point,i=this.options.stroke?this.options.weight/2:0;return t.distanceTo(e)<=this._radius+i}}:{}),o.CircleMarker.include(o.Path.CANVAS?{_updateStyle:function(){o.Path.prototype._updateStyle.call(this)}}:{}),o.GeoJSON=o.FeatureGroup.extend({initialize:function(t,e){o.setOptions(this,e),this._layers={},t&&this.addData(t)},addData:function(t){var e,i,n,s=o.Util.isArray(t)?t:t.features;if(s){for(e=0,i=s.length;i>e;e++)n=s[e],(n.geometries||n.geometry||n.features||n.coordinates)&&this.addData(s[e]);return this}var a=this.options;if(!a.filter||a.filter(t)){var r=o.GeoJSON.geometryToLayer(t,a.pointToLayer,a.coordsToLatLng,a);return r.feature=o.GeoJSON.asFeature(t),r.defaultOptions=r.options,this.resetStyle(r),a.onEachFeature&&a.onEachFeature(t,r),this.addLayer(r)}},resetStyle:function(t){var e=this.options.style;e&&(o.Util.extend(t.options,t.defaultOptions),this._setLayerStyle(t,e))},setStyle:function(t){this.eachLayer(function(e){this._setLayerStyle(e,t)},this)},_setLayerStyle:function(t,e){"function"==typeof e&&(e=e(t.feature)),t.setStyle&&t.setStyle(e)}}),o.extend(o.GeoJSON,{geometryToLayer:function(t,e,i,n){var s,a,r,h,l="Feature"===t.type?t.geometry:t,u=l.coordinates,c=[];switch(i=i||this.coordsToLatLng,l.type){case"Point":return s=i(u),e?e(t,s):new o.Marker(s);case"MultiPoint":for(r=0,h=u.length;h>r;r++)s=i(u[r]),c.push(e?e(t,s):new o.Marker(s));return new o.FeatureGroup(c);case"LineString":return a=this.coordsToLatLngs(u,0,i),new o.Polyline(a,n);case"Polygon":if(2===u.length&&!u[1].length)throw new Error("Invalid GeoJSON object.");return a=this.coordsToLatLngs(u,1,i),new o.Polygon(a,n);case"MultiLineString":return a=this.coordsToLatLngs(u,1,i),new o.MultiPolyline(a,n);case"MultiPolygon":return a=this.coordsToLatLngs(u,2,i),new o.MultiPolygon(a,n);case"GeometryCollection":for(r=0,h=l.geometries.length;h>r;r++)c.push(this.geometryToLayer({geometry:l.geometries[r],type:"Feature",properties:t.properties},e,i,n));return new o.FeatureGroup(c);default:throw new Error("Invalid GeoJSON object.")}},coordsToLatLng:function(t){return new o.LatLng(t[1],t[0],t[2])},coordsToLatLngs:function(t,e,i){var n,o,s,a=[];for(o=0,s=t.length;s>o;o++)n=e?this.coordsToLatLngs(t[o],e-1,i):(i||this.coordsToLatLng)(t[o]),a.push(n);return a},latLngToCoords:function(t){var e=[t.lng,t.lat];return t.alt!==i&&e.push(t.alt),e},latLngsToCoords:function(t){for(var e=[],i=0,n=t.length;n>i;i++)e.push(o.GeoJSON.latLngToCoords(t[i]));return e},getFeature:function(t,e){return t.feature?o.extend({},t.feature,{geometry:e}):o.GeoJSON.asFeature(e)},asFeature:function(t){return"Feature"===t.type?t:{type:"Feature",properties:{},geometry:t}}});var a={toGeoJSON:function(){return o.GeoJSON.getFeature(this,{type:"Point",coordinates:o.GeoJSON.latLngToCoords(this.getLatLng())})}};o.Marker.include(a),o.Circle.include(a),o.CircleMarker.include(a),o.Polyline.include({toGeoJSON:function(){return o.GeoJSON.getFeature(this,{type:"LineString",coordinates:o.GeoJSON.latLngsToCoords(this.getLatLngs())})}}),o.Polygon.include({toGeoJSON:function(){var t,e,i,n=[o.GeoJSON.latLngsToCoords(this.getLatLngs())];if(n[0].push(n[0][0]),this._holes)for(t=0,e=this._holes.length;e>t;t++)i=o.GeoJSON.latLngsToCoords(this._holes[t]),i.push(i[0]),n.push(i);return o.GeoJSON.getFeature(this,{type:"Polygon",coordinates:n})}}),function(){function t(t){return function(){var e=[];return this.eachLayer(function(t){e.push(t.toGeoJSON().geometry.coordinates)}),o.GeoJSON.getFeature(this,{type:t,coordinates:e})}}o.MultiPolyline.include({toGeoJSON:t("MultiLineString")}),o.MultiPolygon.include({toGeoJSON:t("MultiPolygon")}),o.LayerGroup.include({toGeoJSON:function(){var e,i=this.feature&&this.feature.geometry,n=[];if(i&&"MultiPoint"===i.type)return t("MultiPoint").call(this);var s=i&&"GeometryCollection"===i.type;return this.eachLayer(function(t){t.toGeoJSON&&(e=t.toGeoJSON(),n.push(s?e.geometry:o.GeoJSON.asFeature(e)))}),s?o.GeoJSON.getFeature(this,{geometries:n,type:"GeometryCollection"}):{type:"FeatureCollection",features:n}}})}(),o.geoJson=function(t,e){return new o.GeoJSON(t,e)},o.DomEvent={addListener:function(t,e,i,n){var s,a,r,h=o.stamp(i),l="_leaflet_"+e+h;return t[l]?this:(s=function(e){return i.call(n||t,e||o.DomEvent._getEvent())},o.Browser.pointer&&0===e.indexOf("touch")?this.addPointerListener(t,e,s,h):(o.Browser.touch&&"dblclick"===e&&this.addDoubleTapListener&&this.addDoubleTapListener(t,s,h),"addEventListener"in t?"mousewheel"===e?(t.addEventListener("DOMMouseScroll",s,!1),t.addEventListener(e,s,!1)):"mouseenter"===e||"mouseleave"===e?(a=s,r="mouseenter"===e?"mouseover":"mouseout",s=function(e){return o.DomEvent._checkMouse(t,e)?a(e):void 0},t.addEventListener(r,s,!1)):"click"===e&&o.Browser.android?(a=s,s=function(t){return o.DomEvent._filterClick(t,a)},t.addEventListener(e,s,!1)):t.addEventListener(e,s,!1):"attachEvent"in t&&t.attachEvent("on"+e,s),t[l]=s,this))},removeListener:function(t,e,i){var n=o.stamp(i),s="_leaflet_"+e+n,a=t[s];return a?(o.Browser.pointer&&0===e.indexOf("touch")?this.removePointerListener(t,e,n):o.Browser.touch&&"dblclick"===e&&this.removeDoubleTapListener?this.removeDoubleTapListener(t,n):"removeEventListener"in t?"mousewheel"===e?(t.removeEventListener("DOMMouseScroll",a,!1),t.removeEventListener(e,a,!1)):"mouseenter"===e||"mouseleave"===e?t.removeEventListener("mouseenter"===e?"mouseover":"mouseout",a,!1):t.removeEventListener(e,a,!1):"detachEvent"in t&&t.detachEvent("on"+e,a),t[s]=null,this):this},stopPropagation:function(t){return t.stopPropagation?t.stopPropagation():t.cancelBubble=!0,o.DomEvent._skipped(t),this},disableScrollPropagation:function(t){var e=o.DomEvent.stopPropagation;return o.DomEvent.on(t,"mousewheel",e).on(t,"MozMousePixelScroll",e)},disableClickPropagation:function(t){for(var e=o.DomEvent.stopPropagation,i=o.Draggable.START.length-1;i>=0;i--)o.DomEvent.on(t,o.Draggable.START[i],e);return o.DomEvent.on(t,"click",o.DomEvent._fakeStop).on(t,"dblclick",e)},preventDefault:function(t){return t.preventDefault?t.preventDefault():t.returnValue=!1,this},stop:function(t){return o.DomEvent.preventDefault(t).stopPropagation(t)},getMousePosition:function(t,e){if(!e)return new o.Point(t.clientX,t.clientY);var i=e.getBoundingClientRect();return new o.Point(t.clientX-i.left-e.clientLeft,t.clientY-i.top-e.clientTop)},getWheelDelta:function(t){var e=0;return t.wheelDelta&&(e=t.wheelDelta/120),t.detail&&(e=-t.detail/3),e},_skipEvents:{},_fakeStop:function(t){o.DomEvent._skipEvents[t.type]=!0},_skipped:function(t){var e=this._skipEvents[t.type];return this._skipEvents[t.type]=!1,e},_checkMouse:function(t,e){var i=e.relatedTarget;if(!i)return!0;try{for(;i&&i!==t;)i=i.parentNode}catch(n){return!1}return i!==t},_getEvent:function(){var e=t.event;if(!e)for(var i=arguments.callee.caller;i&&(e=i.arguments[0],!e||t.Event!==e.constructor);)i=i.caller;return e},_filterClick:function(t,e){var i=t.timeStamp||t.originalEvent.timeStamp,n=o.DomEvent._lastClick&&i-o.DomEvent._lastClick;return n&&n>100&&500>n||t.target._simulatedClick&&!t._simulated?void o.DomEvent.stop(t):(o.DomEvent._lastClick=i,e(t))}},o.DomEvent.on=o.DomEvent.addListener,o.DomEvent.off=o.DomEvent.removeListener,o.Draggable=o.Class.extend({includes:o.Mixin.Events,statics:{START:o.Browser.touch?["touchstart","mousedown"]:["mousedown"],END:{mousedown:"mouseup",touchstart:"touchend",pointerdown:"touchend",MSPointerDown:"touchend"},MOVE:{mousedown:"mousemove",touchstart:"touchmove",pointerdown:"touchmove",MSPointerDown:"touchmove"}},initialize:function(t,e){this._element=t,this._dragStartTarget=e||t},enable:function(){if(!this._enabled){for(var t=o.Draggable.START.length-1;t>=0;t--)o.DomEvent.on(this._dragStartTarget,o.Draggable.START[t],this._onDown,this);this._enabled=!0}},disable:function(){if(this._enabled){for(var t=o.Draggable.START.length-1;t>=0;t--)o.DomEvent.off(this._dragStartTarget,o.Draggable.START[t],this._onDown,this);this._enabled=!1,this._moved=!1}},_onDown:function(t){if(this._moved=!1,!(t.shiftKey||1!==t.which&&1!==t.button&&!t.touches||(o.DomEvent.stopPropagation(t),o.Draggable._disabled||(o.DomUtil.disableImageDrag(),o.DomUtil.disableTextSelection(),this._moving)))){var i=t.touches?t.touches[0]:t;this._startPoint=new o.Point(i.clientX,i.clientY),this._startPos=this._newPos=o.DomUtil.getPosition(this._element),o.DomEvent.on(e,o.Draggable.MOVE[t.type],this._onMove,this).on(e,o.Draggable.END[t.type],this._onUp,this)}},_onMove:function(t){if(t.touches&&t.touches.length>1)return void(this._moved=!0);var i=t.touches&&1===t.touches.length?t.touches[0]:t,n=new o.Point(i.clientX,i.clientY),s=n.subtract(this._startPoint);(s.x||s.y)&&(o.Browser.touch&&Math.abs(s.x)+Math.abs(s.y)<3||(o.DomEvent.preventDefault(t),this._moved||(this.fire("dragstart"),this._moved=!0,this._startPos=o.DomUtil.getPosition(this._element).subtract(s),o.DomUtil.addClass(e.body,"leaflet-dragging"),this._lastTarget=t.target||t.srcElement,o.DomUtil.addClass(this._lastTarget,"leaflet-drag-target")),this._newPos=this._startPos.add(s),this._moving=!0,o.Util.cancelAnimFrame(this._animRequest),this._animRequest=o.Util.requestAnimFrame(this._updatePosition,this,!0,this._dragStartTarget)))},_updatePosition:function(){this.fire("predrag"),o.DomUtil.setPosition(this._element,this._newPos),this.fire("drag")},_onUp:function(){o.DomUtil.removeClass(e.body,"leaflet-dragging"),this._lastTarget&&(o.DomUtil.removeClass(this._lastTarget,"leaflet-drag-target"),this._lastTarget=null);for(var t in o.Draggable.MOVE)o.DomEvent.off(e,o.Draggable.MOVE[t],this._onMove).off(e,o.Draggable.END[t],this._onUp);o.DomUtil.enableImageDrag(),o.DomUtil.enableTextSelection(),this._moved&&this._moving&&(o.Util.cancelAnimFrame(this._animRequest),this.fire("dragend",{distance:this._newPos.distanceTo(this._startPos)})),this._moving=!1}}),o.Handler=o.Class.extend({initialize:function(t){this._map=t},enable:function(){this._enabled||(this._enabled=!0,this.addHooks())},disable:function(){this._enabled&&(this._enabled=!1,this.removeHooks())},enabled:function(){return!!this._enabled}}),o.Map.mergeOptions({dragging:!0,inertia:!o.Browser.android23,inertiaDeceleration:3400,inertiaMaxSpeed:1/0,inertiaThreshold:o.Browser.touch?32:18,easeLinearity:.25,worldCopyJump:!1}),o.Map.Drag=o.Handler.extend({addHooks:function(){if(!this._draggable){var t=this._map;this._draggable=new o.Draggable(t._mapPane,t._container),this._draggable.on({dragstart:this._onDragStart,drag:this._onDrag,dragend:this._onDragEnd},this),t.options.worldCopyJump&&(this._draggable.on("predrag",this._onPreDrag,this),t.on("viewreset",this._onViewReset,this),t.whenReady(this._onViewReset,this))}this._draggable.enable()},removeHooks:function(){this._draggable.disable()},moved:function(){return this._draggable&&this._draggable._moved},_onDragStart:function(){var t=this._map;t._panAnim&&t._panAnim.stop(),t.fire("movestart").fire("dragstart"),t.options.inertia&&(this._positions=[],this._times=[])},_onDrag:function(){if(this._map.options.inertia){var t=this._lastTime=+new Date,e=this._lastPos=this._draggable._newPos;this._positions.push(e),this._times.push(t),t-this._times[0]>200&&(this._positions.shift(),this._times.shift())}this._map.fire("move").fire("drag")},_onViewReset:function(){var t=this._map.getSize()._divideBy(2),e=this._map.latLngToLayerPoint([0,0]);this._initialWorldOffset=e.subtract(t).x,this._worldWidth=this._map.project([0,180]).x},_onPreDrag:function(){var t=this._worldWidth,e=Math.round(t/2),i=this._initialWorldOffset,n=this._draggable._newPos.x,o=(n-e+i)%t+e-i,s=(n+e+i)%t-e-i,a=Math.abs(o+i)<Math.abs(s+i)?o:s;this._draggable._newPos.x=a},_onDragEnd:function(t){var e=this._map,i=e.options,n=+new Date-this._lastTime,s=!i.inertia||n>i.inertiaThreshold||!this._positions[0];if(e.fire("dragend",t),s)e.fire("moveend");else{var a=this._lastPos.subtract(this._positions[0]),r=(this._lastTime+n-this._times[0])/1e3,h=i.easeLinearity,l=a.multiplyBy(h/r),u=l.distanceTo([0,0]),c=Math.min(i.inertiaMaxSpeed,u),d=l.multiplyBy(c/u),p=c/(i.inertiaDeceleration*h),_=d.multiplyBy(-p/2).round();_.x&&_.y?(_=e._limitOffset(_,e.options.maxBounds),o.Util.requestAnimFrame(function(){e.panBy(_,{duration:p,easeLinearity:h,noMoveStart:!0})})):e.fire("moveend")}}}),o.Map.addInitHook("addHandler","dragging",o.Map.Drag),o.Map.mergeOptions({doubleClickZoom:!0}),o.Map.DoubleClickZoom=o.Handler.extend({addHooks:function(){this._map.on("dblclick",this._onDoubleClick,this)},removeHooks:function(){this._map.off("dblclick",this._onDoubleClick,this)},_onDoubleClick:function(t){var e=this._map,i=e.getZoom()+(t.originalEvent.shiftKey?-1:1);"center"===e.options.doubleClickZoom?e.setZoom(i):e.setZoomAround(t.containerPoint,i)}}),o.Map.addInitHook("addHandler","doubleClickZoom",o.Map.DoubleClickZoom),o.Map.mergeOptions({scrollWheelZoom:!0}),o.Map.ScrollWheelZoom=o.Handler.extend({addHooks:function(){o.DomEvent.on(this._map._container,"mousewheel",this._onWheelScroll,this),o.DomEvent.on(this._map._container,"MozMousePixelScroll",o.DomEvent.preventDefault),this._delta=0},removeHooks:function(){o.DomEvent.off(this._map._container,"mousewheel",this._onWheelScroll),o.DomEvent.off(this._map._container,"MozMousePixelScroll",o.DomEvent.preventDefault)},_onWheelScroll:function(t){var e=o.DomEvent.getWheelDelta(t);this._delta+=e,this._lastMousePos=this._map.mouseEventToContainerPoint(t),this._startTime||(this._startTime=+new Date);var i=Math.max(40-(+new Date-this._startTime),0);clearTimeout(this._timer),this._timer=setTimeout(o.bind(this._performZoom,this),i),o.DomEvent.preventDefault(t),o.DomEvent.stopPropagation(t)},_performZoom:function(){var t=this._map,e=this._delta,i=t.getZoom();e=e>0?Math.ceil(e):Math.floor(e),e=Math.max(Math.min(e,4),-4),e=t._limitZoom(i+e)-i,this._delta=0,this._startTime=null,e&&("center"===t.options.scrollWheelZoom?t.setZoom(i+e):t.setZoomAround(this._lastMousePos,i+e))}}),o.Map.addInitHook("addHandler","scrollWheelZoom",o.Map.ScrollWheelZoom),o.extend(o.DomEvent,{_touchstart:o.Browser.msPointer?"MSPointerDown":o.Browser.pointer?"pointerdown":"touchstart",_touchend:o.Browser.msPointer?"MSPointerUp":o.Browser.pointer?"pointerup":"touchend",addDoubleTapListener:function(t,i,n){function s(t){var e;if(o.Browser.pointer?(_.push(t.pointerId),e=_.length):e=t.touches.length,!(e>1)){var i=Date.now(),n=i-(r||i);h=t.touches?t.touches[0]:t,l=n>0&&u>=n,r=i}}function a(t){if(o.Browser.pointer){var e=_.indexOf(t.pointerId);if(-1===e)return;_.splice(e,1)}if(l){if(o.Browser.pointer){var n,s={};for(var a in h)n=h[a],s[a]="function"==typeof n?n.bind(h):n;h=s}h.type="dblclick",i(h),r=null}}var r,h,l=!1,u=250,c="_leaflet_",d=this._touchstart,p=this._touchend,_=[];t[c+d+n]=s,t[c+p+n]=a;var m=o.Browser.pointer?e.documentElement:t;return t.addEventListener(d,s,!1),m.addEventListener(p,a,!1),o.Browser.pointer&&m.addEventListener(o.DomEvent.POINTER_CANCEL,a,!1),this},removeDoubleTapListener:function(t,i){var n="_leaflet_";return t.removeEventListener(this._touchstart,t[n+this._touchstart+i],!1),(o.Browser.pointer?e.documentElement:t).removeEventListener(this._touchend,t[n+this._touchend+i],!1),o.Browser.pointer&&e.documentElement.removeEventListener(o.DomEvent.POINTER_CANCEL,t[n+this._touchend+i],!1),this}}),o.extend(o.DomEvent,{POINTER_DOWN:o.Browser.msPointer?"MSPointerDown":"pointerdown",POINTER_MOVE:o.Browser.msPointer?"MSPointerMove":"pointermove",POINTER_UP:o.Browser.msPointer?"MSPointerUp":"pointerup",POINTER_CANCEL:o.Browser.msPointer?"MSPointerCancel":"pointercancel",_pointers:[],_pointerDocumentListener:!1,addPointerListener:function(t,e,i,n){switch(e){case"touchstart":return this.addPointerListenerStart(t,e,i,n);case"touchend":return this.addPointerListenerEnd(t,e,i,n);case"touchmove":return this.addPointerListenerMove(t,e,i,n);default:throw"Unknown touch event type"}},addPointerListenerStart:function(t,i,n,s){var a="_leaflet_",r=this._pointers,h=function(t){o.DomEvent.preventDefault(t);for(var e=!1,i=0;i<r.length;i++)if(r[i].pointerId===t.pointerId){e=!0;
 break}e||r.push(t),t.touches=r.slice(),t.changedTouches=[t],n(t)};if(t[a+"touchstart"+s]=h,t.addEventListener(this.POINTER_DOWN,h,!1),!this._pointerDocumentListener){var l=function(t){for(var e=0;e<r.length;e++)if(r[e].pointerId===t.pointerId){r.splice(e,1);break}};e.documentElement.addEventListener(this.POINTER_UP,l,!1),e.documentElement.addEventListener(this.POINTER_CANCEL,l,!1),this._pointerDocumentListener=!0}return this},addPointerListenerMove:function(t,e,i,n){function o(t){if(t.pointerType!==t.MSPOINTER_TYPE_MOUSE&&"mouse"!==t.pointerType||0!==t.buttons){for(var e=0;e<a.length;e++)if(a[e].pointerId===t.pointerId){a[e]=t;break}t.touches=a.slice(),t.changedTouches=[t],i(t)}}var s="_leaflet_",a=this._pointers;return t[s+"touchmove"+n]=o,t.addEventListener(this.POINTER_MOVE,o,!1),this},addPointerListenerEnd:function(t,e,i,n){var o="_leaflet_",s=this._pointers,a=function(t){for(var e=0;e<s.length;e++)if(s[e].pointerId===t.pointerId){s.splice(e,1);break}t.touches=s.slice(),t.changedTouches=[t],i(t)};return t[o+"touchend"+n]=a,t.addEventListener(this.POINTER_UP,a,!1),t.addEventListener(this.POINTER_CANCEL,a,!1),this},removePointerListener:function(t,e,i){var n="_leaflet_",o=t[n+e+i];switch(e){case"touchstart":t.removeEventListener(this.POINTER_DOWN,o,!1);break;case"touchmove":t.removeEventListener(this.POINTER_MOVE,o,!1);break;case"touchend":t.removeEventListener(this.POINTER_UP,o,!1),t.removeEventListener(this.POINTER_CANCEL,o,!1)}return this}}),o.Map.mergeOptions({touchZoom:o.Browser.touch&&!o.Browser.android23,bounceAtZoomLimits:!0}),o.Map.TouchZoom=o.Handler.extend({addHooks:function(){o.DomEvent.on(this._map._container,"touchstart",this._onTouchStart,this)},removeHooks:function(){o.DomEvent.off(this._map._container,"touchstart",this._onTouchStart,this)},_onTouchStart:function(t){var i=this._map;if(t.touches&&2===t.touches.length&&!i._animatingZoom&&!this._zooming){var n=i.mouseEventToLayerPoint(t.touches[0]),s=i.mouseEventToLayerPoint(t.touches[1]),a=i._getCenterLayerPoint();this._startCenter=n.add(s)._divideBy(2),this._startDist=n.distanceTo(s),this._moved=!1,this._zooming=!0,this._centerOffset=a.subtract(this._startCenter),i._panAnim&&i._panAnim.stop(),o.DomEvent.on(e,"touchmove",this._onTouchMove,this).on(e,"touchend",this._onTouchEnd,this),o.DomEvent.preventDefault(t)}},_onTouchMove:function(t){var e=this._map;if(t.touches&&2===t.touches.length&&this._zooming){var i=e.mouseEventToLayerPoint(t.touches[0]),n=e.mouseEventToLayerPoint(t.touches[1]);this._scale=i.distanceTo(n)/this._startDist,this._delta=i._add(n)._divideBy(2)._subtract(this._startCenter),1!==this._scale&&(e.options.bounceAtZoomLimits||!(e.getZoom()===e.getMinZoom()&&this._scale<1||e.getZoom()===e.getMaxZoom()&&this._scale>1))&&(this._moved||(o.DomUtil.addClass(e._mapPane,"leaflet-touching"),e.fire("movestart").fire("zoomstart"),this._moved=!0),o.Util.cancelAnimFrame(this._animRequest),this._animRequest=o.Util.requestAnimFrame(this._updateOnMove,this,!0,this._map._container),o.DomEvent.preventDefault(t))}},_updateOnMove:function(){var t=this._map,e=this._getScaleOrigin(),i=t.layerPointToLatLng(e),n=t.getScaleZoom(this._scale);t._animateZoom(i,n,this._startCenter,this._scale,this._delta,!1,!0)},_onTouchEnd:function(){if(!this._moved||!this._zooming)return void(this._zooming=!1);var t=this._map;this._zooming=!1,o.DomUtil.removeClass(t._mapPane,"leaflet-touching"),o.Util.cancelAnimFrame(this._animRequest),o.DomEvent.off(e,"touchmove",this._onTouchMove).off(e,"touchend",this._onTouchEnd);var i=this._getScaleOrigin(),n=t.layerPointToLatLng(i),s=t.getZoom(),a=t.getScaleZoom(this._scale)-s,r=a>0?Math.ceil(a):Math.floor(a),h=t._limitZoom(s+r),l=t.getZoomScale(h)/this._scale;t._animateZoom(n,h,i,l)},_getScaleOrigin:function(){var t=this._centerOffset.subtract(this._delta).divideBy(this._scale);return this._startCenter.add(t)}}),o.Map.addInitHook("addHandler","touchZoom",o.Map.TouchZoom),o.Map.mergeOptions({tap:!0,tapTolerance:15}),o.Map.Tap=o.Handler.extend({addHooks:function(){o.DomEvent.on(this._map._container,"touchstart",this._onDown,this)},removeHooks:function(){o.DomEvent.off(this._map._container,"touchstart",this._onDown,this)},_onDown:function(t){if(t.touches){if(o.DomEvent.preventDefault(t),this._fireClick=!0,t.touches.length>1)return this._fireClick=!1,void clearTimeout(this._holdTimeout);var i=t.touches[0],n=i.target;this._startPos=this._newPos=new o.Point(i.clientX,i.clientY),n.tagName&&"a"===n.tagName.toLowerCase()&&o.DomUtil.addClass(n,"leaflet-active"),this._holdTimeout=setTimeout(o.bind(function(){this._isTapValid()&&(this._fireClick=!1,this._onUp(),this._simulateEvent("contextmenu",i))},this),1e3),o.DomEvent.on(e,"touchmove",this._onMove,this).on(e,"touchend",this._onUp,this)}},_onUp:function(t){if(clearTimeout(this._holdTimeout),o.DomEvent.off(e,"touchmove",this._onMove,this).off(e,"touchend",this._onUp,this),this._fireClick&&t&&t.changedTouches){var i=t.changedTouches[0],n=i.target;n&&n.tagName&&"a"===n.tagName.toLowerCase()&&o.DomUtil.removeClass(n,"leaflet-active"),this._isTapValid()&&this._simulateEvent("click",i)}},_isTapValid:function(){return this._newPos.distanceTo(this._startPos)<=this._map.options.tapTolerance},_onMove:function(t){var e=t.touches[0];this._newPos=new o.Point(e.clientX,e.clientY)},_simulateEvent:function(i,n){var o=e.createEvent("MouseEvents");o._simulated=!0,n.target._simulatedClick=!0,o.initMouseEvent(i,!0,!0,t,1,n.screenX,n.screenY,n.clientX,n.clientY,!1,!1,!1,!1,0,null),n.target.dispatchEvent(o)}}),o.Browser.touch&&!o.Browser.pointer&&o.Map.addInitHook("addHandler","tap",o.Map.Tap),o.Map.mergeOptions({boxZoom:!0}),o.Map.BoxZoom=o.Handler.extend({initialize:function(t){this._map=t,this._container=t._container,this._pane=t._panes.overlayPane,this._moved=!1},addHooks:function(){o.DomEvent.on(this._container,"mousedown",this._onMouseDown,this)},removeHooks:function(){o.DomEvent.off(this._container,"mousedown",this._onMouseDown),this._moved=!1},moved:function(){return this._moved},_onMouseDown:function(t){return this._moved=!1,!t.shiftKey||1!==t.which&&1!==t.button?!1:(o.DomUtil.disableTextSelection(),o.DomUtil.disableImageDrag(),this._startLayerPoint=this._map.mouseEventToLayerPoint(t),void o.DomEvent.on(e,"mousemove",this._onMouseMove,this).on(e,"mouseup",this._onMouseUp,this).on(e,"keydown",this._onKeyDown,this))},_onMouseMove:function(t){this._moved||(this._box=o.DomUtil.create("div","leaflet-zoom-box",this._pane),o.DomUtil.setPosition(this._box,this._startLayerPoint),this._container.style.cursor="crosshair",this._map.fire("boxzoomstart"));var e=this._startLayerPoint,i=this._box,n=this._map.mouseEventToLayerPoint(t),s=n.subtract(e),a=new o.Point(Math.min(n.x,e.x),Math.min(n.y,e.y));o.DomUtil.setPosition(i,a),this._moved=!0,i.style.width=Math.max(0,Math.abs(s.x)-4)+"px",i.style.height=Math.max(0,Math.abs(s.y)-4)+"px"},_finish:function(){this._moved&&(this._pane.removeChild(this._box),this._container.style.cursor=""),o.DomUtil.enableTextSelection(),o.DomUtil.enableImageDrag(),o.DomEvent.off(e,"mousemove",this._onMouseMove).off(e,"mouseup",this._onMouseUp).off(e,"keydown",this._onKeyDown)},_onMouseUp:function(t){this._finish();var e=this._map,i=e.mouseEventToLayerPoint(t);if(!this._startLayerPoint.equals(i)){var n=new o.LatLngBounds(e.layerPointToLatLng(this._startLayerPoint),e.layerPointToLatLng(i));e.fitBounds(n),e.fire("boxzoomend",{boxZoomBounds:n})}},_onKeyDown:function(t){27===t.keyCode&&this._finish()}}),o.Map.addInitHook("addHandler","boxZoom",o.Map.BoxZoom),o.Map.mergeOptions({keyboard:!0,keyboardPanOffset:80,keyboardZoomOffset:1}),o.Map.Keyboard=o.Handler.extend({keyCodes:{left:[37],right:[39],down:[40],up:[38],zoomIn:[187,107,61,171],zoomOut:[189,109,173]},initialize:function(t){this._map=t,this._setPanOffset(t.options.keyboardPanOffset),this._setZoomOffset(t.options.keyboardZoomOffset)},addHooks:function(){var t=this._map._container;-1===t.tabIndex&&(t.tabIndex="0"),o.DomEvent.on(t,"focus",this._onFocus,this).on(t,"blur",this._onBlur,this).on(t,"mousedown",this._onMouseDown,this),this._map.on("focus",this._addHooks,this).on("blur",this._removeHooks,this)},removeHooks:function(){this._removeHooks();var t=this._map._container;o.DomEvent.off(t,"focus",this._onFocus,this).off(t,"blur",this._onBlur,this).off(t,"mousedown",this._onMouseDown,this),this._map.off("focus",this._addHooks,this).off("blur",this._removeHooks,this)},_onMouseDown:function(){if(!this._focused){var i=e.body,n=e.documentElement,o=i.scrollTop||n.scrollTop,s=i.scrollLeft||n.scrollLeft;this._map._container.focus(),t.scrollTo(s,o)}},_onFocus:function(){this._focused=!0,this._map.fire("focus")},_onBlur:function(){this._focused=!1,this._map.fire("blur")},_setPanOffset:function(t){var e,i,n=this._panKeys={},o=this.keyCodes;for(e=0,i=o.left.length;i>e;e++)n[o.left[e]]=[-1*t,0];for(e=0,i=o.right.length;i>e;e++)n[o.right[e]]=[t,0];for(e=0,i=o.down.length;i>e;e++)n[o.down[e]]=[0,t];for(e=0,i=o.up.length;i>e;e++)n[o.up[e]]=[0,-1*t]},_setZoomOffset:function(t){var e,i,n=this._zoomKeys={},o=this.keyCodes;for(e=0,i=o.zoomIn.length;i>e;e++)n[o.zoomIn[e]]=t;for(e=0,i=o.zoomOut.length;i>e;e++)n[o.zoomOut[e]]=-t},_addHooks:function(){o.DomEvent.on(e,"keydown",this._onKeyDown,this)},_removeHooks:function(){o.DomEvent.off(e,"keydown",this._onKeyDown,this)},_onKeyDown:function(t){var e=t.keyCode,i=this._map;if(e in this._panKeys){if(i._panAnim&&i._panAnim._inProgress)return;i.panBy(this._panKeys[e]),i.options.maxBounds&&i.panInsideBounds(i.options.maxBounds)}else{if(!(e in this._zoomKeys))return;i.setZoom(i.getZoom()+this._zoomKeys[e])}o.DomEvent.stop(t)}}),o.Map.addInitHook("addHandler","keyboard",o.Map.Keyboard),o.Handler.MarkerDrag=o.Handler.extend({initialize:function(t){this._marker=t},addHooks:function(){var t=this._marker._icon;this._draggable||(this._draggable=new o.Draggable(t,t)),this._draggable.on("dragstart",this._onDragStart,this).on("drag",this._onDrag,this).on("dragend",this._onDragEnd,this),this._draggable.enable(),o.DomUtil.addClass(this._marker._icon,"leaflet-marker-draggable")},removeHooks:function(){this._draggable.off("dragstart",this._onDragStart,this).off("drag",this._onDrag,this).off("dragend",this._onDragEnd,this),this._draggable.disable(),o.DomUtil.removeClass(this._marker._icon,"leaflet-marker-draggable")},moved:function(){return this._draggable&&this._draggable._moved},_onDragStart:function(){this._marker.closePopup().fire("movestart").fire("dragstart")},_onDrag:function(){var t=this._marker,e=t._shadow,i=o.DomUtil.getPosition(t._icon),n=t._map.layerPointToLatLng(i);e&&o.DomUtil.setPosition(e,i),t._latlng=n,t.fire("move",{latlng:n}).fire("drag")},_onDragEnd:function(t){this._marker.fire("moveend").fire("dragend",t)}}),o.Control=o.Class.extend({options:{position:"topright"},initialize:function(t){o.setOptions(this,t)},getPosition:function(){return this.options.position},setPosition:function(t){var e=this._map;return e&&e.removeControl(this),this.options.position=t,e&&e.addControl(this),this},getContainer:function(){return this._container},addTo:function(t){this._map=t;var e=this._container=this.onAdd(t),i=this.getPosition(),n=t._controlCorners[i];return o.DomUtil.addClass(e,"leaflet-control"),-1!==i.indexOf("bottom")?n.insertBefore(e,n.firstChild):n.appendChild(e),this},removeFrom:function(t){var e=this.getPosition(),i=t._controlCorners[e];return i.removeChild(this._container),this._map=null,this.onRemove&&this.onRemove(t),this},_refocusOnMap:function(){this._map&&this._map.getContainer().focus()}}),o.control=function(t){return new o.Control(t)},o.Map.include({addControl:function(t){return t.addTo(this),this},removeControl:function(t){return t.removeFrom(this),this},_initControlPos:function(){function t(t,s){var a=i+t+" "+i+s;e[t+s]=o.DomUtil.create("div",a,n)}var e=this._controlCorners={},i="leaflet-",n=this._controlContainer=o.DomUtil.create("div",i+"control-container",this._container);t("top","left"),t("top","right"),t("bottom","left"),t("bottom","right")},_clearControlPos:function(){this._container.removeChild(this._controlContainer)}}),o.Control.Zoom=o.Control.extend({options:{position:"topleft",zoomInText:"+",zoomInTitle:"Zoom in",zoomOutText:"-",zoomOutTitle:"Zoom out"},onAdd:function(t){var e="leaflet-control-zoom",i=o.DomUtil.create("div",e+" leaflet-bar");return this._map=t,this._zoomInButton=this._createButton(this.options.zoomInText,this.options.zoomInTitle,e+"-in",i,this._zoomIn,this),this._zoomOutButton=this._createButton(this.options.zoomOutText,this.options.zoomOutTitle,e+"-out",i,this._zoomOut,this),this._updateDisabled(),t.on("zoomend zoomlevelschange",this._updateDisabled,this),i},onRemove:function(t){t.off("zoomend zoomlevelschange",this._updateDisabled,this)},_zoomIn:function(t){this._map.zoomIn(t.shiftKey?3:1)},_zoomOut:function(t){this._map.zoomOut(t.shiftKey?3:1)},_createButton:function(t,e,i,n,s,a){var r=o.DomUtil.create("a",i,n);r.innerHTML=t,r.href="#",r.title=e;var h=o.DomEvent.stopPropagation;return o.DomEvent.on(r,"click",h).on(r,"mousedown",h).on(r,"dblclick",h).on(r,"click",o.DomEvent.preventDefault).on(r,"click",s,a).on(r,"click",this._refocusOnMap,a),r},_updateDisabled:function(){var t=this._map,e="leaflet-disabled";o.DomUtil.removeClass(this._zoomInButton,e),o.DomUtil.removeClass(this._zoomOutButton,e),t._zoom===t.getMinZoom()&&o.DomUtil.addClass(this._zoomOutButton,e),t._zoom===t.getMaxZoom()&&o.DomUtil.addClass(this._zoomInButton,e)}}),o.Map.mergeOptions({zoomControl:!0}),o.Map.addInitHook(function(){this.options.zoomControl&&(this.zoomControl=new o.Control.Zoom,this.addControl(this.zoomControl))}),o.control.zoom=function(t){return new o.Control.Zoom(t)},o.Control.Attribution=o.Control.extend({options:{position:"bottomright",prefix:'<a href="http://leafletjs.com" title="A JS library for interactive maps">Leaflet</a>'},initialize:function(t){o.setOptions(this,t),this._attributions={}},onAdd:function(t){this._container=o.DomUtil.create("div","leaflet-control-attribution"),o.DomEvent.disableClickPropagation(this._container);for(var e in t._layers)t._layers[e].getAttribution&&this.addAttribution(t._layers[e].getAttribution());return t.on("layeradd",this._onLayerAdd,this).on("layerremove",this._onLayerRemove,this),this._update(),this._container},onRemove:function(t){t.off("layeradd",this._onLayerAdd).off("layerremove",this._onLayerRemove)},setPrefix:function(t){return this.options.prefix=t,this._update(),this},addAttribution:function(t){return t?(this._attributions[t]||(this._attributions[t]=0),this._attributions[t]++,this._update(),this):void 0},removeAttribution:function(t){return t?(this._attributions[t]&&(this._attributions[t]--,this._update()),this):void 0},_update:function(){if(this._map){var t=[];for(var e in this._attributions)this._attributions[e]&&t.push(e);var i=[];this.options.prefix&&i.push(this.options.prefix),t.length&&i.push(t.join(", ")),this._container.innerHTML=i.join(" | ")}},_onLayerAdd:function(t){t.layer.getAttribution&&this.addAttribution(t.layer.getAttribution())},_onLayerRemove:function(t){t.layer.getAttribution&&this.removeAttribution(t.layer.getAttribution())}}),o.Map.mergeOptions({attributionControl:!0}),o.Map.addInitHook(function(){this.options.attributionControl&&(this.attributionControl=(new o.Control.Attribution).addTo(this))}),o.control.attribution=function(t){return new o.Control.Attribution(t)},o.Control.Scale=o.Control.extend({options:{position:"bottomleft",maxWidth:100,metric:!0,imperial:!0,updateWhenIdle:!1},onAdd:function(t){this._map=t;var e="leaflet-control-scale",i=o.DomUtil.create("div",e),n=this.options;return this._addScales(n,e,i),t.on(n.updateWhenIdle?"moveend":"move",this._update,this),t.whenReady(this._update,this),i},onRemove:function(t){t.off(this.options.updateWhenIdle?"moveend":"move",this._update,this)},_addScales:function(t,e,i){t.metric&&(this._mScale=o.DomUtil.create("div",e+"-line",i)),t.imperial&&(this._iScale=o.DomUtil.create("div",e+"-line",i))},_update:function(){var t=this._map.getBounds(),e=t.getCenter().lat,i=6378137*Math.PI*Math.cos(e*Math.PI/180),n=i*(t.getNorthEast().lng-t.getSouthWest().lng)/180,o=this._map.getSize(),s=this.options,a=0;o.x>0&&(a=n*(s.maxWidth/o.x)),this._updateScales(s,a)},_updateScales:function(t,e){t.metric&&e&&this._updateMetric(e),t.imperial&&e&&this._updateImperial(e)},_updateMetric:function(t){var e=this._getRoundNum(t);this._mScale.style.width=this._getScaleWidth(e/t)+"px",this._mScale.innerHTML=1e3>e?e+" m":e/1e3+" km"},_updateImperial:function(t){var e,i,n,o=3.2808399*t,s=this._iScale;o>5280?(e=o/5280,i=this._getRoundNum(e),s.style.width=this._getScaleWidth(i/e)+"px",s.innerHTML=i+" mi"):(n=this._getRoundNum(o),s.style.width=this._getScaleWidth(n/o)+"px",s.innerHTML=n+" ft")},_getScaleWidth:function(t){return Math.round(this.options.maxWidth*t)-10},_getRoundNum:function(t){var e=Math.pow(10,(Math.floor(t)+"").length-1),i=t/e;return i=i>=10?10:i>=5?5:i>=3?3:i>=2?2:1,e*i}}),o.control.scale=function(t){return new o.Control.Scale(t)},o.Control.Layers=o.Control.extend({options:{collapsed:!0,position:"topright",autoZIndex:!0},initialize:function(t,e,i){o.setOptions(this,i),this._layers={},this._lastZIndex=0,this._handlingClick=!1;for(var n in t)this._addLayer(t[n],n);for(n in e)this._addLayer(e[n],n,!0)},onAdd:function(t){return this._initLayout(),this._update(),t.on("layeradd",this._onLayerChange,this).on("layerremove",this._onLayerChange,this),this._container},onRemove:function(t){t.off("layeradd",this._onLayerChange,this).off("layerremove",this._onLayerChange,this)},addBaseLayer:function(t,e){return this._addLayer(t,e),this._update(),this},addOverlay:function(t,e){return this._addLayer(t,e,!0),this._update(),this},removeLayer:function(t){var e=o.stamp(t);return delete this._layers[e],this._update(),this},_initLayout:function(){var t="leaflet-control-layers",e=this._container=o.DomUtil.create("div",t);e.setAttribute("aria-haspopup",!0),o.Browser.touch?o.DomEvent.on(e,"click",o.DomEvent.stopPropagation):o.DomEvent.disableClickPropagation(e).disableScrollPropagation(e);var i=this._form=o.DomUtil.create("form",t+"-list");if(this.options.collapsed){o.Browser.android||o.DomEvent.on(e,"mouseover",this._expand,this).on(e,"mouseout",this._collapse,this);var n=this._layersLink=o.DomUtil.create("a",t+"-toggle",e);n.href="#",n.title="Layers",o.Browser.touch?o.DomEvent.on(n,"click",o.DomEvent.stop).on(n,"click",this._expand,this):o.DomEvent.on(n,"focus",this._expand,this),o.DomEvent.on(i,"click",function(){setTimeout(o.bind(this._onInputClick,this),0)},this),this._map.on("click",this._collapse,this)}else this._expand();this._baseLayersList=o.DomUtil.create("div",t+"-base",i),this._separator=o.DomUtil.create("div",t+"-separator",i),this._overlaysList=o.DomUtil.create("div",t+"-overlays",i),e.appendChild(i)},_addLayer:function(t,e,i){var n=o.stamp(t);this._layers[n]={layer:t,name:e,overlay:i},this.options.autoZIndex&&t.setZIndex&&(this._lastZIndex++,t.setZIndex(this._lastZIndex))},_update:function(){if(this._container){this._baseLayersList.innerHTML="",this._overlaysList.innerHTML="";var t,e,i=!1,n=!1;for(t in this._layers)e=this._layers[t],this._addItem(e),n=n||e.overlay,i=i||!e.overlay;this._separator.style.display=n&&i?"":"none"}},_onLayerChange:function(t){var e=this._layers[o.stamp(t.layer)];if(e){this._handlingClick||this._update();var i=e.overlay?"layeradd"===t.type?"overlayadd":"overlayremove":"layeradd"===t.type?"baselayerchange":null;i&&this._map.fire(i,e)}},_createRadioElement:function(t,i){var n='<input type="radio" class="leaflet-control-layers-selector" name="'+t+'"';i&&(n+=' checked="checked"'),n+="/>";var o=e.createElement("div");return o.innerHTML=n,o.firstChild},_addItem:function(t){var i,n=e.createElement("label"),s=this._map.hasLayer(t.layer);t.overlay?(i=e.createElement("input"),i.type="checkbox",i.className="leaflet-control-layers-selector",i.defaultChecked=s):i=this._createRadioElement("leaflet-base-layers",s),i.layerId=o.stamp(t.layer),o.DomEvent.on(i,"click",this._onInputClick,this);var a=e.createElement("span");a.innerHTML=" "+t.name,n.appendChild(i),n.appendChild(a);var r=t.overlay?this._overlaysList:this._baseLayersList;return r.appendChild(n),n},_onInputClick:function(){var t,e,i,n=this._form.getElementsByTagName("input"),o=n.length;for(this._handlingClick=!0,t=0;o>t;t++)e=n[t],i=this._layers[e.layerId],e.checked&&!this._map.hasLayer(i.layer)?this._map.addLayer(i.layer):!e.checked&&this._map.hasLayer(i.layer)&&this._map.removeLayer(i.layer);this._handlingClick=!1,this._refocusOnMap()},_expand:function(){o.DomUtil.addClass(this._container,"leaflet-control-layers-expanded")},_collapse:function(){this._container.className=this._container.className.replace(" leaflet-control-layers-expanded","")}}),o.control.layers=function(t,e,i){return new o.Control.Layers(t,e,i)},o.PosAnimation=o.Class.extend({includes:o.Mixin.Events,run:function(t,e,i,n){this.stop(),this._el=t,this._inProgress=!0,this._newPos=e,this.fire("start"),t.style[o.DomUtil.TRANSITION]="all "+(i||.25)+"s cubic-bezier(0,0,"+(n||.5)+",1)",o.DomEvent.on(t,o.DomUtil.TRANSITION_END,this._onTransitionEnd,this),o.DomUtil.setPosition(t,e),o.Util.falseFn(t.offsetWidth),this._stepTimer=setInterval(o.bind(this._onStep,this),50)},stop:function(){this._inProgress&&(o.DomUtil.setPosition(this._el,this._getPos()),this._onTransitionEnd(),o.Util.falseFn(this._el.offsetWidth))},_onStep:function(){var t=this._getPos();return t?(this._el._leaflet_pos=t,void this.fire("step")):void this._onTransitionEnd()},_transformRe:/([-+]?(?:\d*\.)?\d+)\D*, ([-+]?(?:\d*\.)?\d+)\D*\)/,_getPos:function(){var e,i,n,s=this._el,a=t.getComputedStyle(s);if(o.Browser.any3d){if(n=a[o.DomUtil.TRANSFORM].match(this._transformRe),!n)return;e=parseFloat(n[1]),i=parseFloat(n[2])}else e=parseFloat(a.left),i=parseFloat(a.top);return new o.Point(e,i,!0)},_onTransitionEnd:function(){o.DomEvent.off(this._el,o.DomUtil.TRANSITION_END,this._onTransitionEnd,this),this._inProgress&&(this._inProgress=!1,this._el.style[o.DomUtil.TRANSITION]="",this._el._leaflet_pos=this._newPos,clearInterval(this._stepTimer),this.fire("step").fire("end"))}}),o.Map.include({setView:function(t,e,n){if(e=e===i?this._zoom:this._limitZoom(e),t=this._limitCenter(o.latLng(t),e,this.options.maxBounds),n=n||{},this._panAnim&&this._panAnim.stop(),this._loaded&&!n.reset&&n!==!0){n.animate!==i&&(n.zoom=o.extend({animate:n.animate},n.zoom),n.pan=o.extend({animate:n.animate},n.pan));var s=this._zoom!==e?this._tryAnimatedZoom&&this._tryAnimatedZoom(t,e,n.zoom):this._tryAnimatedPan(t,n.pan);if(s)return clearTimeout(this._sizeTimer),this}return this._resetView(t,e),this},panBy:function(t,e){if(t=o.point(t).round(),e=e||{},!t.x&&!t.y)return this;if(this._panAnim||(this._panAnim=new o.PosAnimation,this._panAnim.on({step:this._onPanTransitionStep,end:this._onPanTransitionEnd},this)),e.noMoveStart||this.fire("movestart"),e.animate!==!1){o.DomUtil.addClass(this._mapPane,"leaflet-pan-anim");var i=this._getMapPanePos().subtract(t);this._panAnim.run(this._mapPane,i,e.duration||.25,e.easeLinearity)}else this._rawPanBy(t),this.fire("move").fire("moveend");return this},_onPanTransitionStep:function(){this.fire("move")},_onPanTransitionEnd:function(){o.DomUtil.removeClass(this._mapPane,"leaflet-pan-anim"),this.fire("moveend")},_tryAnimatedPan:function(t,e){var i=this._getCenterOffset(t)._floor();return(e&&e.animate)===!0||this.getSize().contains(i)?(this.panBy(i,e),!0):!1}}),o.PosAnimation=o.DomUtil.TRANSITION?o.PosAnimation:o.PosAnimation.extend({run:function(t,e,i,n){this.stop(),this._el=t,this._inProgress=!0,this._duration=i||.25,this._easeOutPower=1/Math.max(n||.5,.2),this._startPos=o.DomUtil.getPosition(t),this._offset=e.subtract(this._startPos),this._startTime=+new Date,this.fire("start"),this._animate()},stop:function(){this._inProgress&&(this._step(),this._complete())},_animate:function(){this._animId=o.Util.requestAnimFrame(this._animate,this),this._step()},_step:function(){var t=+new Date-this._startTime,e=1e3*this._duration;e>t?this._runFrame(this._easeOut(t/e)):(this._runFrame(1),this._complete())},_runFrame:function(t){var e=this._startPos.add(this._offset.multiplyBy(t));o.DomUtil.setPosition(this._el,e),this.fire("step")},_complete:function(){o.Util.cancelAnimFrame(this._animId),this._inProgress=!1,this.fire("end")},_easeOut:function(t){return 1-Math.pow(1-t,this._easeOutPower)}}),o.Map.mergeOptions({zoomAnimation:!0,zoomAnimationThreshold:4}),o.DomUtil.TRANSITION&&o.Map.addInitHook(function(){this._zoomAnimated=this.options.zoomAnimation&&o.DomUtil.TRANSITION&&o.Browser.any3d&&!o.Browser.android23&&!o.Browser.mobileOpera,this._zoomAnimated&&o.DomEvent.on(this._mapPane,o.DomUtil.TRANSITION_END,this._catchTransitionEnd,this)}),o.Map.include(o.DomUtil.TRANSITION?{_catchTransitionEnd:function(t){this._animatingZoom&&t.propertyName.indexOf("transform")>=0&&this._onZoomTransitionEnd()},_nothingToAnimate:function(){return!this._container.getElementsByClassName("leaflet-zoom-animated").length},_tryAnimatedZoom:function(t,e,i){if(this._animatingZoom)return!0;if(i=i||{},!this._zoomAnimated||i.animate===!1||this._nothingToAnimate()||Math.abs(e-this._zoom)>this.options.zoomAnimationThreshold)return!1;var n=this.getZoomScale(e),o=this._getCenterOffset(t)._divideBy(1-1/n),s=this._getCenterLayerPoint()._add(o);return i.animate===!0||this.getSize().contains(o)?(this.fire("movestart").fire("zoomstart"),this._animateZoom(t,e,s,n,null,!0),!0):!1},_animateZoom:function(t,e,i,n,s,a,r){r||(this._animatingZoom=!0),o.DomUtil.addClass(this._mapPane,"leaflet-zoom-anim"),this._animateToCenter=t,this._animateToZoom=e,o.Draggable&&(o.Draggable._disabled=!0),o.Util.requestAnimFrame(function(){this.fire("zoomanim",{center:t,zoom:e,origin:i,scale:n,delta:s,backwards:a})},this)},_onZoomTransitionEnd:function(){this._animatingZoom=!1,o.DomUtil.removeClass(this._mapPane,"leaflet-zoom-anim"),this._resetView(this._animateToCenter,this._animateToZoom,!0,!0),o.Draggable&&(o.Draggable._disabled=!1)}}:{}),o.TileLayer.include({_animateZoom:function(t){this._animating||(this._animating=!0,this._prepareBgBuffer());var e=this._bgBuffer,i=o.DomUtil.TRANSFORM,n=t.delta?o.DomUtil.getTranslateString(t.delta):e.style[i],s=o.DomUtil.getScaleString(t.scale,t.origin);e.style[i]=t.backwards?s+" "+n:n+" "+s},_endZoomAnim:function(){var t=this._tileContainer,e=this._bgBuffer;t.style.visibility="",t.parentNode.appendChild(t),o.Util.falseFn(e.offsetWidth),this._animating=!1},_clearBgBuffer:function(){var t=this._map;!t||t._animatingZoom||t.touchZoom._zooming||(this._bgBuffer.innerHTML="",this._bgBuffer.style[o.DomUtil.TRANSFORM]="")},_prepareBgBuffer:function(){var t=this._tileContainer,e=this._bgBuffer,i=this._getLoadedTilesPercentage(e),n=this._getLoadedTilesPercentage(t);return e&&i>.5&&.5>n?(t.style.visibility="hidden",void this._stopLoadingImages(t)):(e.style.visibility="hidden",e.style[o.DomUtil.TRANSFORM]="",this._tileContainer=e,e=this._bgBuffer=t,this._stopLoadingImages(e),void clearTimeout(this._clearBgBufferTimer))},_getLoadedTilesPercentage:function(t){var e,i,n=t.getElementsByTagName("img"),o=0;for(e=0,i=n.length;i>e;e++)n[e].complete&&o++;return o/i},_stopLoadingImages:function(t){var e,i,n,s=Array.prototype.slice.call(t.getElementsByTagName("img"));for(e=0,i=s.length;i>e;e++)n=s[e],n.complete||(n.onload=o.Util.falseFn,n.onerror=o.Util.falseFn,n.src=o.Util.emptyImageUrl,n.parentNode.removeChild(n))}}),o.Map.include({_defaultLocateOptions:{watch:!1,setView:!1,maxZoom:1/0,timeout:1e4,maximumAge:0,enableHighAccuracy:!1},locate:function(t){if(t=this._locateOptions=o.extend(this._defaultLocateOptions,t),!navigator.geolocation)return this._handleGeolocationError({code:0,message:"Geolocation not supported."}),this;var e=o.bind(this._handleGeolocationResponse,this),i=o.bind(this._handleGeolocationError,this);return t.watch?this._locationWatchId=navigator.geolocation.watchPosition(e,i,t):navigator.geolocation.getCurrentPosition(e,i,t),this},stopLocate:function(){return navigator.geolocation&&navigator.geolocation.clearWatch(this._locationWatchId),this._locateOptions&&(this._locateOptions.setView=!1),this},_handleGeolocationError:function(t){var e=t.code,i=t.message||(1===e?"permission denied":2===e?"position unavailable":"timeout");this._locateOptions.setView&&!this._loaded&&this.fitWorld(),this.fire("locationerror",{code:e,message:"Geolocation error: "+i+"."})},_handleGeolocationResponse:function(t){var e=t.coords.latitude,i=t.coords.longitude,n=new o.LatLng(e,i),s=180*t.coords.accuracy/40075017,a=s/Math.cos(o.LatLng.DEG_TO_RAD*e),r=o.latLngBounds([e-s,i-a],[e+s,i+a]),h=this._locateOptions;if(h.setView){var l=Math.min(this.getBoundsZoom(r),h.maxZoom);this.setView(n,l)}var u={latlng:n,bounds:r,timestamp:t.timestamp};for(var c in t.coords)"number"==typeof t.coords[c]&&(u[c]=t.coords[c]);this.fire("locationfound",u)}})}(window,document);
-},{}],4:[function(require,module,exports){
+},{}],5:[function(require,module,exports){
 /*! Responsive v3.1.3 | MIT License | responsivebp.com */
 !function(t,e,i){"use strict";t.pseudoUnique=function(t){var e=t||8,i="",n="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789",o=n.length;e>o&&(e=o);for(var s=0;e>s;s+=1)i+=n.charAt(Math.floor(Math.random()*o));return i},t.support.rtl=function(){return t("html[dir=rtl]").length?!0:!1}(),t.support.currentGrid=function(){var e=t("<div/>").addClass("grid-state-indicator").prependTo("body");return function(){var t=["xs","s","m","l"],i=parseInt(e.width(),10);return{grid:t[i],index:i,range:t}}}(),t.support.transition=function(){var t=function(){var t=i.createElement("div"),e={transition:"transitionend",WebkitTransition:"webkitTransitionEnd",MozTransition:"transitionend",OTransition:"oTransitionEnd otransitionend"};for(var n in e)if(void 0!==t.style[n])return{end:e[n]};return!1};return t()}(),t.fn.redraw=function(){var t;return this.each(function(){t=this.offsetWidth})},t.fn.ensureTransitionEnd=function(i){if(!t.support.transition)return this;var n=/\d+(.\d+)/,o=!1,s=t(this),a=function(){o||s.trigger(t.support.transition.end)};return i||(i=1e3*(n.test(s.css("transition-duration"))?s.css("transition-duration").match(n)[0]:0)),s.one(t.support.transition.end,function(){o=!0}),e.setTimeout(a,i),this},t.fn.onTransitionEnd=function(e){var i=t.support.transition;return this.each(function(){if(t.isFunction(e)){var n=t(this).redraw();i?n.one(i.end,e):e()}})},t.support.touchEvents=function(){return"ontouchstart"in e||e.DocumentTouch&&i instanceof e.DocumentTouch}(),t.support.pointerEvents=function(){return e.PointerEvent||e.MSPointerEvent}(),function(){var e=t.support.touchEvents,i=t.support.pointerEvents,n=["pointerdown","MSPointerDown"],o=["pointermove","MSPointerMove"],s=["pointerup","pointerout","pointercancel","pointerleave","MSPointerUp","MSPointerOut","MSPointerCancel","MSPointerLeave"],a="touchstart",r="touchmove",d=["touchend","touchleave","touchcancel"],l="mousedown",h="mousemove",c=["mouseup","mouseleave"],u=function(t){var u,p,f;return e?(u=a+t,p=r+t,f=d.join(t+" ")+t):i?(u=n.join(t+" ")+t,p=o.join(t+" ")+t,f=s.join(t+" ")+t):(u=l+t,p=h+t,f=c.join(t+" ")+t),{start:u,move:p,end:f}},p=function(e,n){var o=n.namespace?"."+n.namespace:"",s="swipestart",a="swipemove",r="swipeend",d=u(o),l=n.data&&n.data.touchAction||"none",h=n.data&&n.data.sensitivity||5;return i&&e.css({"-ms-touch-action":""+l,"touch-action":""+l}),e.each(function(){var e=t(this),i={},n={},o=function(o){var s,r="mousemove"===o.type,d="touchmove"!==o.type&&!r,c=o.originalEvent;if(!(r&&1!==o.which||c.touches&&c.touches.length>1||o.scale&&1!==o.scale)){var u,p=(r?c.pageX:d?c.clientX:c.touches[0].pageX)-i.x,f=(r?c.pageY:d?c.clientY:c.touches[0].pageY)-i.y,g=Math.abs(parseFloat(p/e.width()*100))||100,m=Math.abs(parseFloat(f/e.height()*100))||100;switch(l){case"pan-x":Math.abs(f)>Math.abs(p)&&o.preventDefault(),u=Math.abs(f)>Math.abs(p)&&Math.abs(f)>h&&100>m;break;case"pan-y":Math.abs(p)>Math.abs(f)&&o.preventDefault(),u=Math.abs(p)>Math.abs(f)&&Math.abs(p)>h&&100>g;break;default:o.preventDefault(),u=Math.abs(f)>h||Math.abs(p)>h&&100>g&&100>m}o.stopPropagation(),u&&(s=t.Event(a,{delta:{x:p,y:f}}),e.trigger(s),s.isDefaultPrevented()||(n={x:p,y:f}))}},c=function(){var o,s=+new Date-i.time;if(Math.abs(n.x)>1||Math.abs(n.y)>1){var a=n.x<0?"left":"right",l=n.y<0?"up":"down",h=Math.abs(n.x)>Math.abs(n.y)?a:l;o=t.Event(r,{delta:n,direction:h,duration:s}),e.trigger(o)}e.off(d.move).off(d.end)};e.off(d.start).on(d.start,function(a){var r,l="mousedown"===a.type,h="touchstart"!==a.type&&!l,u=a.originalEvent;(h||l)&&t(a.target).is("img")&&a.preventDefault(),a.stopPropagation(),i={x:l?u.pageX:h?u.clientX:u.touches[0].pageX,y:l?u.pageY:h?u.clientY:u.touches[0].pageY,time:+new Date},r=t.Event(s,{start:i}),e.trigger(r),r.isDefaultPrevented()||(n={x:0,y:0},e.on(d.move,o).on(d.end,c))})})},f=function(e,i){var n=i.namespace?"."+i.namespace:"",o=u(n);return e.each(function(){t(this).css({"-ms-touch-action":"","touch-action":""}).off(o.start).off(o.move).off(o.end)})};t.event.special.swipe={add:function(e){p(t(this),e)},remove:function(e){f(t(this),e)}}}(),t.extend(t.expr[":"],{attrStart:function(e,i,n){var o=!1;return t.each(e.attributes,function(){return 0===this.name.indexOf(n[3])?(o=!0,!1):!0}),o}}),t.buildDataOptions=function(e,i,n,o){return t.each(e.data(),function(t,o){if(0===t.indexOf(n)&&t.length>n.length){var s=n.length,a=t.charAt(s).toLowerCase()+t.substring(s+1);i[a]=o,e.removeData(t)}}),o?e.data(o+"."+n+"Options",i):e.data(n+"Options",i),i},t.debounce=function(t,i,n){var o;return function(){var s=this,a=arguments;e.clearTimeout(o),o=e.setTimeout(function(){o=null,n||t.apply(s,a)},i),n&&!o&&t.apply(s,a)}},function(e){var n=t.Event("domchanged"),o=t(i);t.fn.html=function(){var t=e.apply(this,arguments);return arguments.length&&o.trigger(n),t}}(t.fn.html)}(jQuery,window,document),function(t,e,i){"use strict";if(!e.RESPONSIVE_AUTOSIZE){var n="ready"+i,o=["domchanged"+i,"shown.r.modal"].join(" "),s="resize orientationchange",a="keyup",r="paste",d="cut",l="size"+i,h="sized"+i,c=function(i,n){this.$element=t(i),this.defaults={removeAttributes:null,removeClasses:null},this.options=t.extend({},this.defaults,n),this.$clone=null,this.sizing=null,this.clone(),this.$element.on([a,r,d].join(" "),t.proxy(this.change,this)),t(e).off(s).on(s,t.debounce(t.proxy(this.size,this),50))};c.prototype.clone=function(){var e=this,i=this.options.removeAttributes,n=this.options.removeClasses,o=this.$element,s=function(){e.$clone=e.$element.clone().attr({tabindex:-1,rows:2,"aria-hidden":!0}).removeAttr("id name data-autosize "+i).removeClass(n).removeClass(n).addClass("autosize-clone").insertAfter(o),n&&e.$clone.removeData(n)};t.when(s()).then(this.size())},c.prototype.size=function(){var e,i,n=this,o=this.$element,s=this.$element[0],a=this.$clone,r=a[0],d=0,c=t.Event(l),u=function(){n.sizing=!1,o.trigger(t.Event(h))};for(a.width(o.width()),a.val(o.val()),e=a.height(),o.height(e);r.rows>1&&r.scrollHeight<r.offsetHeight;)r.rows-=1;for(;r.scrollHeight>r.offsetHeight&&d!==r.offsetHeight;)d=s.offsetHeight,r.rows+=1;if(r.rows+=1,i=a.height(),e!==i){if(o.trigger(t.Event(l)),this.sizing||c.isDefaultPrevented())return;this.sizing=!0,o.height(a.height()),o.onTransitionEnd(u)}},c.prototype.change=function(t){var i=this,n=0;("paste"===t.type||"cut"===t.type)&&(n=5),e.setTimeout(function(){i.size()},n)},t.fn.autoSize=function(e){return this.each(function(){var i=t(this),n=i.data("r.autosize"),o="object"==typeof e?e:null;n||i.data("r.autosize",n=new c(this,o)),"size"===e&&n.size()})},t.fn.autoSize.Constructor=c;var u=t.fn.autoSize;t.fn.autoSize.noConflict=function(){return t.fn.autoSize=u,this};var p=function(){t("textarea[data-autosize]").each(function(){var e=t(this),i=e.data("r.autosizeOptions");i||e.addClass("autosize").autoSize(t.buildDataOptions(e,{},"autosize","r"))})},f=t.debounce(p,500);t(document).on([n,o].join(" "),function(t){"ready"===t.type?p():f()}),e.RESPONSIVE_AUTOSIZE=!0}}(jQuery,window,".r.autosize"),function(t,e,i){"use strict";if(!e.RESPONSIVE_CAROUSEL){var n=t.support.transition,o=t.support.rtl,s="mouseenter",a="mouseleave",r="keydown",d="click",l="ready"+i,h=["domchanged"+i,"shown.r.modal"].join(" "),c="slide"+i,u="slid"+i,p={SPACE:32,LEFT:37,RIGHT:39},f=function(i,n){this.$element=t(i),this.defaults={interval:0,mode:"slide",pause:"hover",wrap:!0,keyboard:!0,touch:!0,lazyImages:!0,lazyOnDemand:!0,nextTrigger:null,nextHint:"Next ("+(o?"Left":"Right")+" Arrow)",previousTrigger:null,previousHint:"Previous ("+(o?"Right":"Left")+" Arrow)",indicators:null},this.options=t.extend({},this.defaults,n),this.paused=null,this.interval=null,this.sliding=null,this.$items=null,this.translationDuration=null,this.$nextTrigger=this.options.nextTrigger?t(this.options.nextTrigger):this.$element.find(".carousel-control.forward"),this.$previousTrigger=this.options.previousTrigger?t(this.options.previousTrigger):this.$element.find(".carousel-control.back"),this.$indicators=this.options.indicators?t(this.options.indicators):this.$element.find("ol > li"),this.id=this.$element.attr("id")||"carousel-"+t.pseudoUnique();var l=this,h=this.activeindex();this.options.wrap||0===h&&this.$previousTrigger.hide().attr("aria-hidden",!0),1===this.$items.length&&(this.$previousTrigger.hide().attr("aria-hidden",!0),this.$nextTrigger.hide().attr("aria-hidden",!0)),"fade"===this.options.mode&&this.$element.addClass("carousel-fade"),this.options.lazyImages&&!this.options.lazyOnDemand&&t(e).on("load",t.proxy(this.lazyimages),this),this.$element.attr({role:"listbox",id:this.id}),this.$element.children("figure").each(function(){var e=t(this),i=e.hasClass("carousel-active");e.attr({role:"option","aria-selected":i,tabindex:i?0:-1})});var c=this.$nextTrigger.add(this.$previousTrigger);c.each(function(){var e=t(this).attr({tabindex:0,"aria-controls":l.id});e.attr(e.is("button")?{type:"button"}:{role:"button"}),e.find(".visuallyhidden").length||t("<span/>").addClass("visuallyhidden").html(e.is(l.$nextTrigger.selector)?l.options.nextHint:l.options.previousHint).appendTo(e)}),this.$indicators.attr({role:"button","aria-controls":l.id}),"hover"===this.options.pause&&(t.support.touchEvents||t.support.pointerEvents||this.$element.on(s,t.proxy(this.pause,this)).on(a,t.proxy(this.cycle,this))),this.options.touch&&this.$element.on("swipe.carousel",{touchAction:"pan-y"},!0).on("swipemove.carousel",t.proxy(this.swipemove,this)).on("swipeend.carousel",t.proxy(this.swipeend,this)),this.options.keyboard&&this.$element.on(r,t.proxy(this.keydown,this)),t(document).on(d,"[aria-controls="+this.id+"]",t.proxy(this.click,this))};f.prototype.activeindex=function(){var t=this.$element.find(".carousel-active");return this.$items=t.parent().children("figure"),this.$items.index(t)},f.prototype.cycle=function(i){return i||(this.paused=!1),this.interval&&e.clearInterval(this.interval),this.options.interval&&!this.paused&&(this.interval=e.setInterval(t.proxy(this.next,this),this.options.interval)),this},f.prototype.to=function(e){var i=this.activeindex(),n=this;return e>this.$items.length-1||0>e?!1:this.sliding?this.$element.one(u,function(){n.to(e)}):i===e?this.pause().cycle():this.slide(e>i?"next":"prev",t(this.$items[e]))},f.prototype.pause=function(i){return i||(this.paused=!0),this.$element.find(".next, .prev").length&&t.support.transition&&(this.$element.trigger(t.support.transition.end),this.cycle(!0)),this.interval=e.clearInterval(this.interval),this},f.prototype.next=function(){return this.sliding?!1:this.slide("next")},f.prototype.prev=function(){return this.sliding?!1:this.slide("prev")},f.prototype.slide=function(e,i){var n,o,s=this.$element.children("figure.carousel-active"),a=i||s[e]("figure"),r=this.interval,d="next"===e,l=d?"left":"right",h=d?"first":"last",p=this;if(r&&this.pause(),!a.length){if(!this.options.wrap)return!1;a=this.$element.children("figure")[h]()}if(a.hasClass("carousel-active"))return this.sliding=!1;if(n=t.Event(c,{relatedTarget:a[0],direction:l}),this.$element.trigger(n),n.isDefaultPrevented())return!1;this.options.lazyImages&&this.options.lazyOnDemand&&this.lazyimages.call(a),this.sliding=!0,r&&this.pause(),this.$element.one(u,function(){if(!p.options.wrap){var t=p.activeindex();p.$items&&t===p.$items.length-1?(p.$nextTrigger.hide().attr("aria-hidden",!0),p.$previousTrigger.show().removeAttr("aria-hidden")):p.$items&&0===t?(p.$previousTrigger.hide().attr("aria-hidden",!0),p.$nextTrigger.show().removeAttr("aria-hidden")):(p.$nextTrigger.show().removeAttr("aria-hidden"),p.$previousTrigger.show().removeAttr("aria-hidden"))}p.$indicators.removeClass("active").eq(p.activeindex()).addClass("active")});var f=function(){p.$items&&p.$items.removeClass("swiping").css({"transition-duration":""}),s.removeClass(["carousel-active",l].join(" ")).attr({"aria-selected":!1,tabIndex:-1}),a.removeClass([e,l].join(" ")).addClass("carousel-active").attr({"aria-selected":!0,tabIndex:0}),p.sliding=!1,o=t.Event(u,{relatedTarget:a[0],direction:l}),p.$element.trigger(o)};return a.addClass(e).redraw(),s.addClass(l),a.addClass(l),this.$items&&this.$items.each(function(){t(this).removeClass("swipe swipe-next").css({left:"",right:"",opacity:""})}),s.onTransitionEnd(f).ensureTransitionEnd(),r&&this.cycle(),this},f.prototype.keydown=function(t){var e=t&&t.which;if(e===p.LEFT||e===p.RIGHT)switch(t.preventDefault(),t.stopPropagation(),e){case p.LEFT:o?(this.next(),this.$nextTrigger.focus()):(this.prev(),this.$previousTrigger.focus());break;case p.RIGHT:o?(this.prev(),this.$previousTrigger.focus()):(this.next(),this.$nextTrigger.focus())}},f.prototype.click=function(e){if(e){e.preventDefault(),e.stopPropagation();var i=t(e.target),n=i.is(this.$indicators.selector);n?this.to(i.index()):i.is(this.$nextTrigger.selector)?this.next():i.is(this.$previousTrigger.selector)&&this.prev()}},f.prototype.swipemove=function(t){if(!this.sliding){this.pause();var e=t.delta.x<0,i=e?o?"prev":"next":o?"next":"prev",n=e?o?"last":"first":o?"first":"last",s=this.activeindex(),a=this.$items.eq(s),r=a[i]("figure");if(1!==this.$items.length){if(!r.length){if(!this.options.wrap)return;r=this.$element.children("figure")[n]()}if(this.$items.not(a).not(r).removeClass("swipe swiping swipe-next").css({left:"",right:"",opacity:""}),!r.hasClass("carousel-active")){this.options.lazyImages&&this.options.lazyOnDemand&&this.lazyimages.call(r);var d=a.width(),l=parseFloat(t.delta.x/d*100),h=e?100:-100;o&&(l*=-1),this.$element.addClass("no-transition"),"slide"===this.options.mode?o?(a.addClass("swiping").css({right:l+"%"}),r.addClass("swipe swipe-next").css({right:l-h+"%"})):(a.addClass("swiping").css({left:l+"%"}),r.addClass("swipe swipe-next").css({left:l+h+"%"})):(a.addClass("swipe").css({opacity:1-Math.abs(l/100)}),r.addClass("swipe swipe-next"))}}}},f.prototype.swipeend=function(e){if(!this.sliding&&this.$element.hasClass("no-transition")){var i=e.direction,o="next";if("right"===i&&(o="prev"),this.$element.removeClass("no-transition"),n){var s=this.activeindex(),a=this.$items.eq(s);this.translationDuration||(this.translationDuration=parseFloat(a.css("transition-duration")));var r=a.width(),d=Math.abs(e.delta.x)/r*100,l=e.duration/1e3*100/d,h=(100-d)/100*Math.min(this.translationDuration,l);this.$items.each(function(){t(this).css({"transition-duration":h+"s"})})}this.cycle(),this.slide(o,t(this.$items.filter(".swipe-next")))}},f.prototype.lazyimages=function(){this.data("lazyLoaded")||(this.find("img[data-src]").each(function(){0===this.src.length&&(this.src=this.getAttribute("data-src"))}),this.data("lazyLoaded",!0))},t.fn.carousel=function(e){return this.each(function(){var i=t(this),n=i.data("r.carousel"),o="object"==typeof e?e:null;n||i.data("r.carousel",n=new f(this,o)),"number"==typeof e?n.to(e):"string"==typeof e&&/(cycle|pause|next|prev)/.test(e)||(e=o.slide)?n[e]():n.options.interval&&n.pause().cycle()})},t.fn.carousel.Constructor=f;var g=t.fn.carousel;t.fn.carousel.noConflict=function(){return t.fn.carousel=g,this};var m=function(){t(".carousel").each(function(){var e=t(this),i=e.data("r.carouselOptions");i||e.carousel(t.buildDataOptions(e,{},"carousel","r"))})},v=t.debounce(m,500);t(document).on([l,h].join(" "),function(t){"ready"===t.type?m():v()}),e.RESPONSIVE_CAROUSEL=!0}}(jQuery,window,".r.carousel"),function(t,e,i){"use strict";if(!e.RESPONSIVE_CONDITIONAL){var n="ready"+i,o=["domchanged"+i,"shown.r.modal"].join(" "),s=["resize","orientationchange"].join(".conditional "),a="loaded"+i,r="error"+i,d=function(i,n){this.$element=t(i),this.defaults={xs:null,s:null,m:null,l:null,fallback:null,errorHint:"<p>An error has occured.</p>"},this.cache={},this.options=t.extend({},this.defaults,n),this.currentGrid=null,this.currentTarget=null,this.sizing=null,t(e).on(s,t.debounce(t.proxy(this.resize,this),50)),this.resize()};d.prototype.resize=function(){var e=t.support.currentGrid(),i=e.grid,n=e.range;if(!this.options.fallback)for(var o in n)if(n.hasOwnProperty(o)){var s=n[o];this.options[s]||(this.options[s]="fallback",this.cache[s]=this.$element.html())}if(this.currentGrid!==i){this.currentGrid=i;var d=this,l=this.options[i]||this.options.fallback;l&&l!==this.currentTarget&&(this.currentTarget=l,this.cache[this.currentGrid]?(this.$element.empty().html(this.cache[this.currentGrid]),this.$element.trigger(t.Event(a,{relatedTarget:d.$element[0],loadTarget:l,grid:this.currentGrid}))):this.$element.empty().load(l,null,function(e,n){if("error"===n)return d.$element.trigger(t.Event(r,{relatedTarget:d.$element[0],loadTarget:l,grid:d.currentGrid})),void d.$element.html(d.options.errorHint);var o,s=l.indexOf(" ");s>=0&&(o=t.trim(l.slice(s))),d.cache[i]=o?jQuery("<div>").append(t.parseHTML(e)).find(o).wrap("<div>").parent().html():e,d.$element.trigger(t.Event(a,{relatedTarget:d.$element[0],loadTarget:l,grid:d.currentGrid}))}))}},t.fn.conditional=function(e){return this.each(function(){var i=t(this),n=i.data("r.conditional"),o="object"==typeof e?e:null;n||i.data("r.conditional",n=new d(this,o)),"resize"===e&&n.resize()})},t.fn.conditional.Constructor=d;var l=t.fn.conditional;t.fn.conditional.noConflict=function(){return t.fn.conditional=l,this};var h=function(){t(":attrStart(data-conditional)").each(function(){var e=t(this),i=e.data("r.conditionalOptions");i||e.conditional(t.buildDataOptions(e,{},"conditional","r"))})},c=t.debounce(h,500);t(document).on([n,o].join(" "),function(t){"ready"===t.type?h():c()}),e.RESPONSIVE_CONDITIONAL=!0}}(jQuery,window,".r.conditional"),function(t,e,i){"use strict";if(!e.RESPONSIVE_DISMISS){var n="ready"+i,o=["domchanged"+i,"shown.r.modal"].join(" "),s="click",a="dismiss"+i,r="dismissed"+i,d=function(e,i){this.defaults={closeHint:"Click to close"},this.options=t.extend({},this.defaults,i),this.$element=t(e).attr({type:"button"}),this.$target=this.$element.closest(i.target),this.dismissing=null,this.$element.is("button")&&t(e).attr({type:"button"}),this.$target.hasClass("alert")&&this.$target.attr({role:"alert"}),this.$element.find(".visuallyhidden").length||t("<span/>").addClass("visuallyhidden").html(this.options.closeHint).appendTo(this.$element),this.$element.on(s,t.proxy(this.click,this))};d.prototype.close=function(){var e=t.Event(a),i=this.$target,n=this,o=function(){n.dismissing=!1,i.addClass("hidden").attr({"aria-hidden":!0,tabindex:-1}),n.$element.trigger(t.Event(r))};this.$element.trigger(e),this.dismissing||e.isDefaultPrevented()||(this.dismissing=!0,i.addClass("fade-in fade-out").redraw().removeClass("fade-in"),this.$target.onTransitionEnd(o))},d.prototype.click=function(t){t.preventDefault(),this.close()},t.fn.dismiss=function(e){return this.each(function(){var i=t(this),n=i.data("dismiss");n||i.data("dismiss",n=new d(this,e)),"close"===e&&n.close()})},t.fn.dismiss.Constructor=d;var l=t.fn.dismiss;t.fn.dismiss.noConflict=function(){return t.fn.dismiss=l,this};var h=function(){t("button[data-dismiss-target]").each(function(){var e=t(this),i=e.data("r.dismissOptions");i||e.dismiss(t.buildDataOptions(e,{},"dismiss","r"))})},c=t.debounce(h,500);t(document).on([n,o].join(" "),function(t){"ready"===t.type?h():c()}),e.RESPONSIVE_DISMISS=!0}}(jQuery,window,".r.dismiss"),function(t,e,i){"use strict";if(!e.RESPONSIVE_DROPDOWN){var n=e.getComputedStyle&&t.support.transition,o=t.support.rtl,s="ready"+i,a=["domchanged"+i,"shown.r.modal"].join(" "),r="click",d="keydown",l="show"+i,h="shown"+i,c="hide"+i,u="hidden"+i,p={SPACE:32,LEFT:37,RIGHT:39},f=function(e,i){this.$element=t(e),this.$target=t(i.target),this.defaults={dimension:"height"},this.options=t.extend({},this.defaults,i),this.$parent=null,this.transitioning=null,this.endSize=null,this.options.parent&&(this.$parent=this.$target.closest(this.options.parent)),this.$parent?this.$parent.attr({role:"tablist","aria-multiselectable":"true"}).find("div:not(.collapse,.accordion-body)").attr("role","presentation"):t(".accordion").find("div:not(.collapse,.accordion-body)").addBack().attr("role","presentation");var n=t("[href='"+this.options.target+"'], [data-dropdown-target='"+this.options.target+"']"),o=n.attr("id")||"dropdown-"+t.pseudoUnique(),s=this.$target.attr("id")||"dropdown-"+t.pseudoUnique(),a=!this.$target.hasClass("collapse");n.attr({id:o,role:"tab","aria-controls":s,"aria-selected":a,"aria-expanded":a,tabindex:0}),this.$target.attr({id:s,role:"tabpanel","aria-labelledby":o,"aria-hidden":!a,tabindex:a?0:-1}),this.$element.on(r,t.proxy(this.click,this)),this.$element.on(d,t.proxy(this.keydown,this))};f.prototype.show=function(){if(!this.transitioning&&!this.$target.hasClass("expand")){var i=this,o=this.options.dimension,s=[];this.$parent&&(s=this.$parent.find(" > [role=presentation] > [role=presentation]").children("[role=tab]"),s=t.grep(s,function(e){var n=t(e).data("r.dropdown"),o=n&&n.$target;return o&&o.hasClass("dropdown-group")&&!o.hasClass("collapse")&&n.$parent&&n.$parent[0]===i.$parent[0]})),this.$target[o](0),n&&(this.$target[o]("auto"),this.endSize=e.getComputedStyle(this.$target[0])[o],this.$target[o](0).redraw()),this.$target[o](this.endSize||""),this.transition("removeClass",t.Event(l),h),s&&s.length&&t.each(s,function(){t(this).dropdown("hide")})}},f.prototype.hide=function(){if(!this.transitioning&&!this.$target.hasClass("collapse")){var i,o=this.options.dimension;n&&(i=e.getComputedStyle(this.$target[0])[o],this.$target[o](i).redraw()),this.$target.removeClass("expand"),this.$target[o](0),this.transition("addClass",t.Event(c),u)}},f.prototype.toggle=function(){this[this.$target.hasClass("collapse")?"show":"hide"]()},f.prototype.transition=function(e,i,n){var o=this,s="removeClass"===e,a=function(){var e=t.Event(n);o.$target.removeClass("trans")[o.options.dimension](""),o.transitioning=!1,o.$target.attr({"aria-hidden":!s,tabindex:s?0:-1});var i=t("#"+o.$target.attr("aria-labelledby")).attr({"aria-selected":s,"aria-expanded":s});s&&i.focus(),o.$target.find("[tabindex]:not(.collapse)").attr({"aria-hidden":!s,tabindex:s?0:-1}),o.$element.trigger(e)};this.transitioning||i.isDefaultPrevented()||(this.transitioning=!0,this.$element.trigger(i),this.$target[e]("collapse"),this.$target["show"===i.type?"addClass":"removeClass"]("expand trans"),this.$target.onTransitionEnd(a))},f.prototype.click=function(t){t.preventDefault(),t.stopPropagation(),this.toggle()},f.prototype.keydown=function(e){var i=e.which;if(i===p.SPACE||i===p.LEFT||i===p.RIGHT){e.preventDefault(),e.stopPropagation();var n=t(e.target),s=n.closest(this.options.parent?"[role=tablist]":".accordion"),a=s.find(" > [role=presentation] > [role=presentation]").children("[role=tab]"),r=a.index(a.filter(":focus")),d=a.length;if(i===p.SPACE)return void t(a.eq(r)).data("r.dropdown").toggle();i===p.LEFT?o?r+=1:r-=1:i===p.RIGHT&&(o?r-=1:r+=1),r===d&&(r=0),0>r&&(r=d-1),t(a.eq(r)).data("r.dropdown").show()}},t.fn.dropdown=function(e){return this.each(function(){var i=t(this),n=i.data("r.dropdown"),o="object"==typeof e?e:null;n||i.data("r.dropdown",n=new f(this,o)),"string"==typeof e&&/(show|hide|toggle)/.test(e)&&n[e]()})},t.fn.dropdown.Constructor=f;var g=t.fn.dropdown;t.fn.dropdown.noConflict=function(){return t.fn.dropdown=g,this};var m=function(){t(":attrStart(data-dropdown)").each(function(){var e=t(this),i=e.data("r.dropdownOptions");i||e.dropdown(t.buildDataOptions(e,{},"dropdown","r"))})},v=t.debounce(m,500);t(document).on([s,a].join(" "),function(t){"ready"===t.type?m():v()}),e.RESPONSIVE_DROPDOWN=!0}}(jQuery,window,".r.dropdown"),function(t,e,i){"use strict";if(!e.RESPONSIVE_MODAL){var n=t(e),o=t("html"),s=t("body"),a=t("<div/>").attr({role:"document"}).addClass("modal-overlay modal-loader fade-out"),r=t("<div/>").addClass("modal fade-out").appendTo(a),d=t("<div/>").addClass("modal-header fade-out"),l=t("<div/>").addClass("modal-footer fade-out"),h=t("<button/>").attr({type:"button"}).addClass("modal-close fade-out"),c=t("<button/>").attr({type:"button"}).addClass("modal-direction prev fade-out"),u=t("<button/>").attr({type:"button"}).addClass("modal-direction next fade-out"),p=t("<div/>").addClass("modal-placeholder"),f="ready"+i,g="domchanged"+i,m=["resize","orientationchange"].join(".modal "),v="click",y="keydown",w="focusin",b="show"+i,$="shown"+i,x="hide"+i,C="hidden"+i,T="error"+i,E=t.support.rtl,S=t.support.transition,P=t.support.currentGrid(),O={ESCAPE:27,LEFT:37,RIGHT:39},D=0,z=0===e.location.protocol.indexOf("http")?e.location.protocol:"http:",k=new RegExp("//"+e.location.host+"($|/)"),I=/(^data:image\/.*,)|(\.(jp(e|g|eg)|gif|png|bmp|ti(ff|f)|webp|svg)((\?|#).*)?$)/i,A=/^#.*$/,j=/^([\w.+-]+:)(?:\/\/([^\/?#:]*)(?::(\d+)|)|)/,M=/^(?:about|app|app-storage|.+-extension|file|res|widget):$/,H=function(i,n){this.$element=t(i),this.defaults={modal:null,external:!1,group:null,iframe:!1,iframeScroll:!0,keyboard:!0,touch:!0,next:">",nextHint:"Next ("+(E?"Left":"Right")+" Arrow)",prev:"<",previousHint:"Previous ("+(E?"Right":"Left")+" Arrow)",closeHint:"Close (Esc)",errorHint:"<p>An error has occured.</p>",mobileTarget:null,mobileViewportWidth:"xs",fitViewport:!0},this.options=t.extend({},this.defaults,n),this.title=null,this.description=null,this.isShown=null,this.$group=null,this.options.group&&(this.$group=t(this.options.group)),this.$element.on(v,t.proxy(this.click,this));var o=t.debounce(t.proxy(this.resize,this),15);t(e).off(m).on(m,o)};H.prototype.show=function(){if(!this.isShown){if(this.options.mobileTarget){var i=this.options.mobileViewportWidth;if("number"==typeof i&&i>=n.width())return void(e.location.href=this.options.mobileTarget);if("string"==typeof i){var o=t.inArray(i,P.range);if(P.index<=o&&o>-1)return void(e.location.href=this.options.mobileTarget)}}var s=this,d=t.Event(b),l=t.Event($),p=function(){r.data("currentModal",s.$element),r.focus(),t(document).on(w,function(e){if(e.target!==a[0]&&!t.contains(a[0],e.target)){var i=r.find("input, select, a, iframe, img, button").first();return i.length?i.focus():!s.options.modal&&h.focus()||a.focus(),!1}return!0}),s.options.keyboard&&t(document).on(y,t.proxy(s.keydown,s)),s.options.group&&s.options.touch&&r.on("swipe.modal",!0).on("swipeend.modal",t.proxy(s.swipeend,s)),r.off(v).on(v,t.proxy(function(t){var e=u[0],i=c[0],n=t.target;return n===e||n===i?(t.preventDefault(),t.stopPropagation(),void this[n===e?"next":"prev"]()):void(this.options.modal&&n===r.find(this.options.modal)[0]&&(t.preventDefault(),t.stopPropagation(),this.hide()))},s)),s.$element.trigger(l)};this.$element.trigger(d),d.isDefaultPrevented()||(this.isShown=!0,this.overlay(),this.create(),r.onTransitionEnd(p))}},H.prototype.hide=function(e,i){if(this.isShown){var n=this,o=t.Event(x),s=t.Event(C),a=function(){n.destroy(i),r.removeData("currentModal"),n.$element.trigger(s)};this.$element.trigger(o),o.isDefaultPrevented()||(this.isShown=!1,t.each([d,l,h,r,u,c],function(){this.removeClass("fade-in").redraw()}),t(document).off(w),this.options.keyboard&&t(document).off(y),this.options.touch&&r.off("swipe.modal swipeend.modal"),e||this.overlay(!0),r.onTransitionEnd(a).ensureTransitionEnd())}},H.prototype.overlay=function(e){var i=e?"removeClass":"addClass",d=this,l=function(){return e?(a.addClass("hidden"),o.removeClass("modal-on").css("margin-right",""),void(o.hasClass("modal-lock")&&(o.removeClass("modal-lock"),D!==n.scrollTop()&&(n.scrollTop(D),D=0)))):void a.off(v).on(v,function(e){if(!d.options.modal){var i=h[0],n=e.target;n===r[0]||t.contains(r[0],n)||(n===i&&(e.preventDefault(),e.stopPropagation(),d.hide()),(n===a[0]||t.contains(a[0],n))&&d.hide())}})},c=function(){var e=t("<div/>").css({width:99,height:99,overflow:"scroll",position:"absolute",top:-9999});s.append(e);var i=e[0].offsetWidth-e[0].clientWidth;return e.remove(),i};t(".modal-overlay").length||s.append(a),e||(0===D&&(D=n.scrollTop()),o.addClass("modal-on").css("margin-right",c())),a.removeClass("hidden").redraw()[i]("fade-in").redraw(),a.onTransitionEnd(l)},H.prototype.create=function(){a.addClass("modal-loader"),this.options.external=!A.test(this.options.target);var e=function(t){var e=j.exec(t)||j.exec(z+t);return void 0===e||A.test(t)?!1:e&&e[2]&&!M.test(e[1])?!k.test(e[2]):!1},i=function(){n.resize(),t.each([d,l,h,u,c,r],function(){this.addClass("fade-in").redraw()}),a.removeClass("modal-loader")},n=this,o=this.options.title,s=this.options.description,f=this.options.modal,g=this.options.target,m=e(g),v=!this.options.external&&!m,y=this.$group,w=this.options.next+'<span class="visuallyhidden">'+this.options.nextHint+"</span>",b=this.options.prev+'<span class="visuallyhidden">'+this.options.prevHint+"</span>",$=this.options.iframeScroll,x=this.options.iframe||!v?m&&!I.test(g):!1,C=t("<div/>").addClass($?"media media-scroll":"media"),E=t("<div/>").addClass("modal-content");if(y){var S=y.filter(function(){return t(this).data("r.modal")});S.length&&(u.html(w).prependTo(r),c.html(b).prependTo(r))}if(o||!f){if(o){var P="modal-label-"+t.pseudoUnique();d.html('<div class="container"><h2 id="'+P+'">'+o+"</h2></div>").appendTo(a.attr({"aria-labelledby":P}))}f||h.html('x <span class="visuallyhidden">'+this.options.closeHint+"</span>").appendTo(a)}if(s&&l.html('<div class="container">'+s+"</div>").appendTo(a),v){var O=t(g);this.isLocalHidden=O.is(":hidden"),r.addClass(this.options.fitViewport?"container":""),p.detach().insertAfter(O),O.detach().appendTo(E).removeClass("hidden"),E.appendTo(r),i()}else if(x){r.addClass("modal-iframe");var D=0!==g.indexOf("http")?z+g:g,H=function(t){var e={youtube:/youtu(be\.com|be\.googleapis\.com|\.be)/i,vimeo:/vimeo/i,vine:/vine/i,instagram:/instagram|instagr\.am/i,getty:/embed\.gettyimages\.com/i};for(var i in e)if(e.hasOwnProperty(i)&&e[i].test(t))return[i,"scaled"].join(" ");return!1};t("<iframe/>").attr({scrolling:$?"yes":"no",allowTransparency:!0,frameborder:0,hspace:0,vspace:0,webkitallowfullscreen:"",mozallowfullscreen:"",allowfullscreen:""}).one("load error",function(){i()}).appendTo(C).attr("src",D);var R=H(g)||"";C.addClass(R).appendTo(r)}else I.test(g)?(r.addClass("modal-image"),t("<img/>").one("load error",function(){i()}).appendTo(r).attr("src",g)):(r.addClass("modal-ajax"),r.addClass(this.options.fitViewport?"container":""),E.load(g,null,function(e,o){"error"===o&&(n.$element.trigger(t.Event(T,{relatedTarget:E[0]})),E.html(n.options.errorHint)),E.appendTo(r),i()}))},H.prototype.destroy=function(i){u.detach(),c.detach(),d.empty().detach(),l.empty().detach(),h.detach(),a.removeAttr("aria-labelledby"),this.options.external||(t(this.options.target).addClass(this.isLocalHidden?"hidden":"").detach().insertAfter(p),p.detach().insertAfter(a));var n=this;r.find("iframe").attr("src",""),e.setTimeout(function(){r.removeClass("modal-iframe modal-ajax modal-image container").css({"max-height":"","max-width":""}).empty(),i&&i.call(n)},100)},H.prototype.click=function(t){t.preventDefault();var i=r.data("currentModal");if(i&&i[0]!==this.$element[0]){var n=this,o=function(){S?n.show():e.setTimeout(function(){n.show()},300)};return void i.data("r.modal").hide(!0,o)}this.show()},H.prototype.keydown=function(t){this.options.modal||(t.which===O.ESCAPE&&this.hide(),this.options.group&&(t.which===O.LEFT&&(E?this.next():this.prev()),t.which===O.RIGHT&&(E?this.prev():this.next())))},H.prototype.resize=function(){var i=n.height(),s=d.length&&d.height()||0,a=h.length&&h.outerHeight()||0,c=a>s?a:s,u=l.length&&l.height()||0,p=.95*(i-(c+u));if(t(".modal-overlay").css({"padding-top":c,"padding-bottom":u}),r.hasClass("modal-image"))r.children("img").css("max-height",p);else if(r.hasClass("modal-iframe")){var f=r.find(".media > iframe"),g=f.width(),m=f.height(),v=g/m,y=p*v;f.parent().hasClass("scaled")&&r.css({"max-height":p,"max-width":y})}else{var w=r.children(".modal-content");t.each([r,w],function(){this.css({"max-height":p})}),e.MSPointerEvent&&w.length&&w.children("*:first")[0].scrollHeight>w.height()&&o.addClass("modal-lock")}P=t.support.currentGrid()},H.prototype.direction=function(i){if(this.isShown&&this.options.group){var n=this,o=this.$group.index(this.$element),s=this.$group.length,a="next"===i?o+1:o-1,r=function(){n.$sibling&&n.$sibling.data("r.modal")&&(S?n.$sibling.data("r.modal").show():e.setTimeout(function(){n.$sibling.data("r.modal").show()
 },300))};"next"===i?(a>=s||0>a)&&(a=0):(a>=s&&(a=0),0>a&&(a=s-1)),this.$sibling=t(this.$group[a]),this.hide(!0,r)}},H.prototype.next=function(){this.direction("next")},H.prototype.prev=function(){this.direction("prev")},H.prototype.swipeend=function(t){return E?void this["right"===t.direction?"prev":"next"]():void this["right"===t.direction?"next":"prev"]()},t.fn.modal=function(e){return this.each(function(){var i=t(this),n=i.data("r.modal"),o="object"==typeof e?e:{};o.target||(o.target=i.attr("href")),n||i.data("r.modal",n=new H(this,o)),"string"==typeof e&&/(show|hide|next|prev)/.test(e)&&n[e]()})},t.fn.modal.Constructor=H;var R=t.fn.modal;t.fn.modal.noConflict=function(){return t.fn.modal=R,this};var L=function(){t(":attrStart(data-modal)").each(function(){var e=t(this),i=e.data("r.modalOptions");i||e.modal(t.buildDataOptions(e,{},"modal","r"))})},N=t.debounce(L,500);t(document).on([f,g,$].join(" "),function(t){"ready"===t.type?L():N()}),e.RESPONSIVE_MODAL=!0}}(jQuery,window,".r.modal"),function(t,e,i){"use strict";if(!e.RESPONSIVE_TABLE){var n="ready"+i,o=["domchanged"+i,"shown.r.modal"].join(" "),s="add"+i,a="added"+i,r=function(e){this.$element=t(e).addClass("table-list"),this.$thead=this.$element.find("thead"),this.$tfoot=this.$element.find("tfoot"),this.$tbody=this.$element.find("tbody"),this.$headerColumns=this.$thead.find("th"),this.$footerColumns=this.$tfoot.find("th"),this.$bodyRows=this.$tbody.find("tr"),this.isAdded=null,this.add()};r.prototype.add=function(){if(!this.isAdded){var e=this,i=t.Event(s),n=function(){e.$element.trigger(t.Event(a))};this.$element.trigger(i),i.isDefaultPrevented()||(this.isAdded=!0,t.each(this.$bodyRows,function(){t(this).find("th, td").each(function(i){var n=t(this),o=t(e.$headerColumns[i]).text();if(n.attr("data-thead",o),e.$tfoot.length){var s=t(e.$footerColumns[i]).text();n.attr("data-tfoot",s)}})}),this.$element.redraw().addClass("fade-in"),this.$element.onTransitionEnd(n))}},t.fn.tablelist=function(e){return this.each(function(){var i=t(this),n=i.data("r.tablelist"),o="object"==typeof e?e:null;n||i.data("r.tablelist",n=new r(this,o)),"string"==typeof e&&n[e]()})},t.fn.tablelist.Constructor=r;var d=t.fn.table;t.fn.tablelist.noConflict=function(){return t.fn.tablelist=d,this};var l=function(){t("table[data-table-list]").each(function(){var e=t(this),i=e.data("r.tablelistOptions");i||e.tablelist(t.buildDataOptions(e,{},"tablelist","r"))})},h=t.debounce(l,500);t(document).on([n,o].join(" "),function(t){"ready"===t.type?l():h()}),e.RESPONSIVE_TABLE=!0}}(jQuery,window,".r.tablelist"),function(t,e,i){"use strict";if(!e.RESPONSIVE_TABS){var n=t.support.rtl,o="ready"+i,s=["domchanged"+i,"shown.r.modal"].join(" "),a="click",r="keydown",d="show"+i,l="shown"+i,h={SPACE:32,LEFT:37,RIGHT:39},c=function(e){this.$element=t(e),this.tabbing=null;var i=this.$element.children("ul:first").attr("role","tablist"),n=i.children().attr("role","presentation"),o=this.$element.children(":not(ul)"),s=t.pseudoUnique();n.each(function(e){var i=t(this),n=i.children("a");n.attr({role:"tab",id:"tab-"+s+"-"+e,"aria-controls":"pane-"+s+"-"+e,"aria-selected":i.hasClass("tab-active")?!0:!1,tabIndex:0}),o.eq(e).attr({role:"tabpanel",id:"pane-"+s+"-"+e,"aria-labelledby":"tab-"+s+"-"+e,tabIndex:i.hasClass("tab-active")?0:-1})}),t(this.$element).on(a,"ul[role=tablist] > li > [role=tab]",t.proxy(this.click,this)).on(r,"ul[role=tablist] > li > [role=tab]",t.proxy(this.keydown,this))};c.prototype.show=function(e){var i=this.$element.children("ul").children(".tab-active"),n=i.parent().children(),o=n.index(i),s=this;return e>n.length-1||0>e?!1:o===e?!1:this.tab(o,e,function(e){var i=function(){s.tabbing=!1,s.$element.trigger(t.Event(l))};e.onTransitionEnd(i)})},c.prototype.tab=function(e,i,n){var o=t.Event(d),s=this.$element,a=s.children("ul").children("li"),r=s.children(":not(ul)"),l=a.eq(i),h=r.eq(e),c=r.eq(i);s.trigger(o),this.tabbing||o.isDefaultPrevented()||(this.tabbing=!0,a.removeClass("tab-active").children("a").attr({"aria-selected":!1}),l.addClass("tab-active").children("a").attr({"aria-selected":!0}).focus(),h.addClass("fade-out fade-in"),c.attr({tabIndex:0}).addClass("tab-pane-active fade-out"),r.filter(".fade-in").attr({tabIndex:-1}).removeClass("tab-pane-active fade-in"),c.redraw().addClass("fade-in"),n.call(this,c))},c.prototype.click=function(e){e.preventDefault(),e.stopPropagation();var i=t(e.target),n=i.parent(),o=n.index();this.show(o)},c.prototype.keydown=function(e){var i=e.which;if(i===h.SPACE||i===h.LEFT||i===h.RIGHT){e.preventDefault(),e.stopPropagation();var o=t(e.target),s=o.parent(),a=s.siblings().addBack(),r=a.length,d=s.index();if(i===h.SPACE)return void this.show(d);d=i===h.LEFT?n?d+1:d-1:n?d-1:d+1,d===r&&(d=0),0>d&&(d=r-1),this.show(d)}},t.fn.tabs=function(e){return this.each(function(){var i=t(this),n=i.data("r.tabs");n||i.data("r.tabs",n=new c(this)),"number"==typeof e&&n.show(e)})},t.fn.tabs.Constructor=c;var u=t.fn.tabs;t.fn.tabs.noConflict=function(){return t.fn.tabs=u,this};var p=function(){t("[data-tabs]").each(function(){var e=t(this),i=e.data("r.tabsLoaded");i||(e.data("r.tabsLoaded",!0),e.tabs())})},f=t.debounce(p,500);t(document).on([o,s].join(" "),function(t){"ready"===t.type?p():f()}),e.RESPONSIVE_TABS=!0}}(jQuery,window,".r.tabs");
-},{}],5:[function(require,module,exports){
+},{}],6:[function(require,module,exports){
+/*!
+ * Sir Trevor JS v0.3.2
+ *
+ * Released under the MIT license
+ * www.opensource.org/licenses/MIT
+ *
+ * 2013-12-20
+ */
+
+(function ($, _){
+
+  var root = this,
+      SirTrevor;
+
+  SirTrevor = root.SirTrevor = {};
+  SirTrevor.DEBUG = false;
+  SirTrevor.SKIP_VALIDATION = false;
+
+  SirTrevor.version = "0.3.0";
+  SirTrevor.LANGUAGE = "en";
+
+  function $element(el) {
+    return el instanceof $ ? el : $(el);
+  }
+
+  /*
+   Define default attributes that can be extended through an object passed to the
+   initialize function of SirTrevor
+  */
+
+  SirTrevor.DEFAULTS = {
+    defaultType: false,
+    spinner: {
+      className: 'st-spinner',
+      lines: 9,
+      length: 8,
+      width: 3,
+      radius: 6,
+      color: '#000',
+      speed: 1.4,
+      trail: 57,
+      shadow: false,
+      left: '50%',
+      top: '50%'
+    },
+    blockLimit: 0,
+    blockTypeLimits: {},
+    required: [],
+    uploadUrl: '/attachments',
+    baseImageUrl: '/sir-trevor-uploads/',
+    errorsContainer: undefined
+  };
+
+  SirTrevor.BlockMixins = {};
+  SirTrevor.Blocks = {};
+  SirTrevor.Formatters = {};
+  SirTrevor.instances = [];
+  SirTrevor.Events = Eventable;
+
+  var formBound = false; // Flag to tell us once we've bound our submit event
+
+  /* Generic function binding utility, used by lots of our classes */
+  var FunctionBind = {
+    bound: [],
+    _bindFunctions: function(){
+      if (this.bound.length > 0) {
+        _.bindAll.apply(null, _.union([this], this.bound));
+      }
+    }
+  };
+
+  var Renderable = {
+    tagName: 'div',
+    className: 'sir-trevor__view',
+    attributes: {},
+
+    $: function(selector) {
+      return this.$el.find(selector);
+    },
+
+    render: function() {
+      return this;
+    },
+
+    destroy: function() {
+      if (!_.isUndefined(this.stopListening)) { this.stopListening(); }
+      this.$el.remove();
+    },
+
+    _ensureElement: function() {
+      if (!this.el) {
+        var attrs = _.extend({}, _.result(this, 'attributes')),
+            html;
+        if (this.id) { attrs.id = this.id; }
+        if (this.className) { attrs['class'] = this.className; }
+
+        if (attrs.html) {
+          html = attrs.html;
+          delete attrs.html;
+        }
+        var $el = $('<' + this.tagName + '>').attr(attrs);
+        if (html) { $el.html(html); }
+        this._setElement($el);
+      } else {
+        this._setElement(this.el);
+      }
+    },
+
+    _setElement: function(element) {
+      this.$el = $element(element);
+      this.el = this.$el[0];
+      return this;
+    }
+  };
+
+  function diffText(before, after) {
+    var pos1 = -1,
+        pos2 = -1,
+        after_len = after.length,
+        before_len = before.length;
+  
+    for (var i = 0; i < after_len; i++) {
+      if (pos1 == -1 && before.substr(i, 1) != after.substr(i, 1)) {
+        pos1 = i - 1;
+      }
+  
+      if (pos2 == -1 &&
+          before.substr(before_len - i - 1, 1) !=
+          after.substr(after_len - i - 1, 1)
+        ) {
+        pos2 = i;
+      }
+    }
+  
+    return {
+      result: after.substr(pos1, after_len - pos2 - pos1 + 1),
+      pos1: pos1,
+      pos2: pos2
+    };
+  }
+  /*
+    Drop Area Plugin from @maccman
+    http://blog.alexmaccaw.com/svbtle-image-uploading
+    --
+    Tweaked so we use the parent class of dropzone
+  */
+  
+  (function($){
+    function dragEnter(e) {
+      e.preventDefault();
+    }
+  
+    function dragOver(e) {
+      e.originalEvent.dataTransfer.dropEffect = "copy";
+      $(e.currentTarget).addClass('st-drag-over');
+      e.preventDefault();
+    }
+  
+    function dragLeave(e) {
+      $(e.currentTarget).removeClass('st-drag-over');
+      e.preventDefault();
+    }
+  
+    $.fn.dropArea = function(){
+      this.bind("dragenter", dragEnter).
+           bind("dragover",  dragOver).
+           bind("dragleave", dragLeave);
+      return this;
+    };
+  
+    $.fn.noDropArea = function(){
+      this.unbind("dragenter").
+           unbind("dragover").
+           unbind("dragleave");
+      return this;
+    };
+  
+    $.fn.caretToEnd = function(){
+      var range,selection;
+  
+      range = document.createRange();
+      range.selectNodeContents(this[0]);
+      range.collapse(false);
+  
+      selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+  
+      return this;
+    };
+  
+  })(jQuery);
+  /*
+    Backbone Inheritence 
+    --
+    From: https://github.com/documentcloud/backbone/blob/master/backbone.js
+    Backbone.js 0.9.2
+    (c) 2010-2012 Jeremy Ashkenas, DocumentCloud Inc.
+  */
+  
+  var extend = function(protoProps, staticProps) {
+    var parent = this;
+    var child;
+  
+    // The constructor function for the new subclass is either defined by you
+    // (the "constructor" property in your `extend` definition), or defaulted
+    // by us to simply call the parent's constructor.
+    if (protoProps && _.has(protoProps, 'constructor')) {
+      child = protoProps.constructor;
+    } else {
+      child = function(){ return parent.apply(this, arguments); };
+    }
+  
+    // Add static properties to the constructor function, if supplied.
+    _.extend(child, parent, staticProps);
+  
+    // Set the prototype chain to inherit from `parent`, without calling
+    // `parent`'s constructor function.
+    var Surrogate = function(){ this.constructor = child; };
+    Surrogate.prototype = parent.prototype;
+    child.prototype = new Surrogate;
+  
+    // Add prototype properties (instance properties) to the subclass,
+    // if supplied.
+    if (protoProps) _.extend(child.prototype, protoProps);
+  
+    // Set a convenience property in case the parent's prototype is needed
+    // later.
+    child.__super__ = parent.prototype;
+  
+    return child;
+  };
+  /*
+  * Ultra simple logging
+  */
+  
+  SirTrevor.log = function(message) {
+    if (!_.isUndefined(console) && SirTrevor.DEBUG) {
+      console.log(message);
+    }
+  };
+  SirTrevor.Locales = {
+    en: {
+      general: {
+        'delete':           'Delete?',
+        'drop':             'Drag __block__ here',
+        'paste':            'Or paste URL here',
+        'upload':           '...or choose a file',
+        'close':            'close',
+        'position':         'Position',
+        'wait':             'Please wait...',
+        'link':             'Enter a link'
+      },
+      errors: {
+        'title': "You have the following errors:",
+        'validation_fail': "__type__ block is invalid",
+        'block_empty': "__name__ must not be empty",
+        'type_missing': "You must have a block of type __type__",
+        'required_type_empty': "A required block type __type__ is empty",
+        'load_fail': "There was a problem loading the contents of the document"
+      },
+      blocks: {
+        text: {
+          'title': "Text"
+        },
+        list: {
+          'title': "List"
+        },
+        quote: {
+          'title': "Quote",
+          'credit_field': "Credit"
+        },
+        image: {
+          'title': "Image",
+          'upload_error': "There was a problem with your upload"
+        },
+        video: {
+          'title': "Video"
+        },
+        tweet: {
+          'title': "Tweet",
+          'fetch_error': "There was a problem fetching your tweet"
+        },
+        embedly: {
+          'title': "Embedly",
+          'fetch_error': "There was a problem fetching your embed",
+          'key_missing': "An Embedly API key must be present"
+        },
+        heading: {
+          'title': "Heading"
+        }
+      }
+    }
+  };
+  
+  if (window.i18n === undefined) {
+    // Minimal i18n stub that only reads the English strings
+    SirTrevor.log("Using i18n stub");
+    window.i18n = {
+      t: function(key, options) {
+        var parts = key.split(':'), str, obj, part, i;
+  
+        obj = SirTrevor.Locales[SirTrevor.LANGUAGE];
+  
+        for(i = 0; i < parts.length; i++) {
+          part = parts[i];
+  
+          if(!_.isUndefined(obj[part])) {
+            obj = obj[part];
+          }
+        }
+  
+        str = obj;
+  
+        if (!_.isString(str)) { return ""; }
+  
+        if (str.indexOf('__') >= 0) {
+          _.each(options, function(value, opt) {
+            str = str.replace('__' + opt + '__', value);
+          });
+        }
+  
+        return str;
+      }
+    };
+  } else {
+    SirTrevor.log("Using i18next");
+    // Only use i18next when the library has been loaded by the user, keeps
+    // dependencies slim
+    i18n.init({ resStore: SirTrevor.Locales, fallbackLng: SirTrevor.LANGUAGE,
+                ns: { namespaces: ['general', 'blocks'], defaultNs: 'general' }
+    });
+  }
+  //fgnass.github.com/spin.js#v1.2.5
+  (function(a,b,c){function g(a,c){var d=b.createElement(a||"div"),e;for(e in c)d[e]=c[e];return d}function h(a){for(var b=1,c=arguments.length;b<c;b++)a.appendChild(arguments[b]);return a}function j(a,b,c,d){var g=["opacity",b,~~(a*100),c,d].join("-"),h=.01+c/d*100,j=Math.max(1-(1-a)/b*(100-h),a),k=f.substring(0,f.indexOf("Animation")).toLowerCase(),l=k&&"-"+k+"-"||"";return e[g]||(i.insertRule("@"+l+"keyframes "+g+"{"+"0%{opacity:"+j+"}"+h+"%{opacity:"+a+"}"+(h+.01)+"%{opacity:1}"+(h+b)%100+"%{opacity:"+a+"}"+"100%{opacity:"+j+"}"+"}",0),e[g]=1),g}function k(a,b){var e=a.style,f,g;if(e[b]!==c)return b;b=b.charAt(0).toUpperCase()+b.slice(1);for(g=0;g<d.length;g++){f=d[g]+b;if(e[f]!==c)return f}}function l(a,b){for(var c in b)a.style[k(a,c)||c]=b[c];return a}function m(a){for(var b=1;b<arguments.length;b++){var d=arguments[b];for(var e in d)a[e]===c&&(a[e]=d[e])}return a}function n(a){var b={x:a.offsetLeft,y:a.offsetTop};while(a=a.offsetParent)b.x+=a.offsetLeft,b.y+=a.offsetTop;return b}var d=["webkit","Moz","ms","O"],e={},f,i=function(){var a=g("style");return h(b.getElementsByTagName("head")[0],a),a.sheet||a.styleSheet}(),o={lines:12,length:7,width:5,radius:10,rotate:0,color:"#000",speed:1,trail:100,opacity:.25,fps:20,zIndex:2e9,className:"spinner",top:"auto",left:"auto"},p=function q(a){if(!this.spin)return new q(a);this.opts=m(a||{},q.defaults,o)};p.defaults={},m(p.prototype,{spin:function(a){this.stop();var b=this,c=b.opts,d=b.el=l(g(0,{className:c.className}),{position:"relative",zIndex:c.zIndex}),e=c.radius+c.length+c.width,h,i;a&&(a.insertBefore(d,a.firstChild||null),i=n(a),h=n(d),l(d,{left:(c.left=="auto"?i.x-h.x+(a.offsetWidth>>1):c.left+e)+"px",top:(c.top=="auto"?i.y-h.y+(a.offsetHeight>>1):c.top+e)+"px"})),d.setAttribute("aria-role","progressbar"),b.lines(d,b.opts);if(!f){var j=0,k=c.fps,m=k/c.speed,o=(1-c.opacity)/(m*c.trail/100),p=m/c.lines;!function q(){j++;for(var a=c.lines;a;a--){var e=Math.max(1-(j+a*p)%m*o,c.opacity);b.opacity(d,c.lines-a,e,c)}b.timeout=b.el&&setTimeout(q,~~(1e3/k))}()}return b},stop:function(){var a=this.el;return a&&(clearTimeout(this.timeout),a.parentNode&&a.parentNode.removeChild(a),this.el=c),this},lines:function(a,b){function e(a,d){return l(g(),{position:"absolute",width:b.length+b.width+"px",height:b.width+"px",background:a,boxShadow:d,transformOrigin:"left",transform:"rotate("+~~(360/b.lines*c+b.rotate)+"deg) translate("+b.radius+"px"+",0)",borderRadius:(b.width>>1)+"px"})}var c=0,d;for(;c<b.lines;c++)d=l(g(),{position:"absolute",top:1+~(b.width/2)+"px",transform:b.hwaccel?"translate3d(0,0,0)":"",opacity:b.opacity,animation:f&&j(b.opacity,b.trail,c,b.lines)+" "+1/b.speed+"s linear infinite"}),b.shadow&&h(d,l(e("#000","0 0 4px #000"),{top:"2px"})),h(a,h(d,e(b.color,"0 0 1px rgba(0,0,0,.1)")));return a},opacity:function(a,b,c){b<a.childNodes.length&&(a.childNodes[b].style.opacity=c)}}),!function(){function a(a,b){return g("<"+a+' xmlns="urn:schemas-microsoft.com:vml" class="spin-vml">',b)}var b=l(g("group"),{behavior:"url(#default#VML)"});!k(b,"transform")&&b.adj?(i.addRule(".spin-vml","behavior:url(#default#VML)"),p.prototype.lines=function(b,c){function f(){return l(a("group",{coordsize:e+" "+e,coordorigin:-d+" "+ -d}),{width:e,height:e})}function k(b,e,g){h(i,h(l(f(),{rotation:360/c.lines*b+"deg",left:~~e}),h(l(a("roundrect",{arcsize:1}),{width:d,height:c.width,left:c.radius,top:-c.width>>1,filter:g}),a("fill",{color:c.color,opacity:c.opacity}),a("stroke",{opacity:0}))))}var d=c.length+c.width,e=2*d,g=-(c.width+c.length)*2+"px",i=l(f(),{position:"absolute",top:g,left:g}),j;if(c.shadow)for(j=1;j<=c.lines;j++)k(j,-2,"progid:DXImageTransform.Microsoft.Blur(pixelradius=2,makeshadow=1,shadowopacity=.3)");for(j=1;j<=c.lines;j++)k(j);return h(b,i)},p.prototype.opacity=function(a,b,c,d){var e=a.firstChild;d=d.shadow&&d.lines||0,e&&b+d<e.childNodes.length&&(e=e.childNodes[b+d],e=e&&e.firstChild,e=e&&e.firstChild,e&&(e.opacity=c))}):f=k(b,"animation")}(),a.Spinner=p})(window,document);
+  /*
+  * Sir Trevor Editor Store
+  * By default we store the complete data on the instances $el
+  * We can easily extend this and store it on some server or something
+  */
+  
+  SirTrevor.editorStore = function(editor, method, options) {
+    var resp;
+  
+    options = options || {};
+  
+    switch(method) {
+  
+      case "create":
+        // Grab our JSON from the textarea and clean any whitespace incase there is a line wrap between the opening and closing textarea tags
+        var content = _.trim(editor.$el.val());
+        editor.dataStore = { data: [] };
+  
+        if (content.length > 0) {
+          try {
+            // Ensure the JSON string has a data element that's an array
+            var str = JSON.parse(content);
+            if (!_.isUndefined(str.data)) {
+              // Set it
+              editor.dataStore = str;
+            }
+          } catch(e) {
+            editor.errors.push({ text: i18n.t("errors:load_fail") });
+            editor.renderErrors();
+  
+            console.log('Sorry there has been a problem with parsing the JSON');
+            console.log(e);
+          }
+        }
+      break;
+  
+      case "reset":
+        editor.dataStore = { data: [] };
+      break;
+  
+      case "add":
+        if (options.data) {
+          editor.dataStore.data.push(options.data);
+          resp = editor.dataStore;
+        }
+      break;
+  
+      case "save":
+        // Store to our element
+        editor.$el.val((editor.dataStore.data.length > 0) ? JSON.stringify(editor.dataStore) : '');
+      break;
+  
+      case "read":
+        resp = editor.dataStore;
+      break;
+  
+    }
+  
+    if(resp) {
+      return resp;
+    }
+  
+  };
+  /*
+    SirTrevor.Submittable
+    --
+    We need a global way of setting if the editor can and can't be submitted,
+    and a way to disable the submit button and add messages (when appropriate)
+    We also need this to be highly extensible so it can be overridden.
+    This will be triggered *by anything* so it needs to subscribe to events.
+  */
+  
+  var Submittable = function(){
+    this.intialize();
+  };
+  
+  _.extend(Submittable.prototype, {
+  
+    intialize: function(){
+      this.submitBtn = $("input[type='submit']");
+  
+      var btnTitles = [];
+  
+      _.each(this.submitBtn, function(btn){
+        btnTitles.push($(btn).attr('value'));
+      });
+  
+      this.submitBtnTitles = btnTitles;
+      this.canSubmit = true;
+      this.globalUploadCount = 0;
+      this._bindEvents();
+    },
+  
+    setSubmitButton: function(e, message) {
+      this.submitBtn.attr('value', message);
+    },
+  
+    resetSubmitButton: function(){
+      _.each(this.submitBtn, function(item, index){
+        $(item).attr('value', this.submitBtnTitles[index]);
+      }, this);
+    },
+  
+    onUploadStart: function(e){
+      this.globalUploadCount++;
+      SirTrevor.log('onUploadStart called ' + this.globalUploadCount);
+  
+      if(this.globalUploadCount === 1) {
+        this._disableSubmitButton();
+      }
+    },
+  
+    onUploadStop: function(e) {
+      this.globalUploadCount = (this.globalUploadCount <= 0) ? 0 : this.globalUploadCount - 1;
+  
+      SirTrevor.log('onUploadStop called ' + this.globalUploadCount);
+  
+      if(this.globalUploadCount === 0) {
+        this._enableSubmitButton();
+      }
+    },
+  
+    onError: function(e){
+      SirTrevor.log('onError called');
+      this.canSubmit = false;
+    },
+  
+    _disableSubmitButton: function(message){
+      this.setSubmitButton(null, message || i18n.t("general:wait"));
+      this.submitBtn
+        .attr('disabled', 'disabled')
+        .addClass('disabled');
+    },
+  
+    _enableSubmitButton: function(){
+      this.resetSubmitButton();
+      this.submitBtn
+        .removeAttr('disabled')
+        .removeClass('disabled');
+    },
+  
+    _events : {
+      "disableSubmitButton" : "_disableSubmitButton",
+      "enableSubmitButton"  : "_enableSubmitButton",
+      "setSubmitButton"     : "setSubmitButton",
+      "resetSubmitButton"   : "resetSubmitButton",
+      "onError"             : "onError",
+      "onUploadStart"       : "onUploadStart",
+      "onUploadStop"        : "onUploadStop"
+    },
+  
+    _bindEvents: function(){
+      _.forEach(this._events, function(callback, type) {
+        SirTrevor.EventBus.on(type, this[callback], this);
+      }, this);
+    }
+  
+  });
+  
+  SirTrevor.submittable = function(){
+    new Submittable();
+  };
+  /*
+  *   Sir Trevor Uploader
+  *   Generic Upload implementation that can be extended for blocks
+  */
+  
+  SirTrevor.fileUploader = function(block, file, success, error) {
+  
+    SirTrevor.EventBus.trigger("onUploadStart");
+  
+    var uid  = [block.blockID, (new Date()).getTime(), 'raw'].join('-');
+    var data = new FormData();
+  
+    data.append('attachment[name]', file.name);
+    data.append('attachment[file]', file);
+    data.append('attachment[uid]', uid);
+  
+    block.resetMessages();
+  
+    var callbackSuccess = function(data){
+      SirTrevor.log('Upload callback called');
+      SirTrevor.EventBus.trigger("onUploadStop");
+  
+      if (!_.isUndefined(success) && _.isFunction(success)) {
+        _.bind(success, block)(data);
+      }
+    };
+  
+    var callbackError = function(jqXHR, status, errorThrown){
+      SirTrevor.log('Upload callback error called');
+      SirTrevor.EventBus.trigger("onUploadStop");
+  
+      if (!_.isUndefined(error) && _.isFunction(error)) {
+        _.bind(error, block)(status);
+      }
+    };
+  
+    var xhr = $.ajax({
+      url: SirTrevor.DEFAULTS.uploadUrl,
+      data: data,
+      cache: false,
+      contentType: false,
+      processData: false,
+      dataType: 'json',
+      type: 'POST'
+    });
+  
+    block.addQueuedItem(uid, xhr);
+  
+    xhr.done(callbackSuccess)
+       .fail(callbackError)
+       .always(_.bind(block.removeQueuedItem, block, uid));
+  
+    return xhr;
+  };
+  /*
+    Underscore helpers
+  */
+  
+  var url_regex = /^(?:([A-Za-z]+):)?(\/{0,3})([0-9.\-A-Za-z]+)(?::(\d+))?(?:\/([^?#]*))?(?:\?([^#]*))?(?:#(.*))?$/;
+  
+  _.mixin({
+    isURI : function(string) {
+      return (url_regex.test(string));
+    },
+  
+    titleize: function(str){
+      if (str === null) return '';
+      str  = String(str).toLowerCase();
+      return str.replace(/(?:^|\s|-)\S/g, function(c){ return c.toUpperCase(); });
+    },
+  
+    classify: function(str){
+      return _.titleize(String(str).replace(/[\W_]/g, ' ')).replace(/\s/g, '');
+    },
+  
+    classifyList: function(a){
+      return _.map(a, function(i){ return _.classify(i); });
+    },
+  
+    capitalize : function(string) {
+      return string.charAt(0).toUpperCase() + string.substring(1).toLowerCase();
+    },
+  
+    underscored: function(str){
+      return _.trim(str).replace(/([a-z\d])([A-Z]+)/g, '$1_$2')
+                        .replace(/[-\s]+/g, '_').toLowerCase();
+    },
+  
+    trim : function(string) {
+      return string.replace(/^\s\s*/, '').replace(/\s\s*$/, '');
+    },
+  
+    reverse: function(str) {
+      return str.split("").reverse().join("");
+    },
+  
+    flattern: function(obj) {
+      var x = {};
+      _.each(obj, function(a,b) {
+        x[(_.isArray(obj)) ? a : b] = true;
+      });
+      return x;
+    },
+  
+    to_slug: function(str) {
+      return str
+          .toLowerCase()
+          .replace(/[^\w ]+/g,'')
+          .replace(/ +/g,'-');
+    }
+  
+  });
+  
+  SirTrevor.toHTML = function(markdown, type) {
+    // MD -> HTML
+    type = _.classify(type);
+  
+    var html = markdown,
+        shouldWrap = type === "Text";
+  
+    if(_.isUndefined(shouldWrap)) { shouldWrap = false; }
+  
+    if (shouldWrap) {
+      html = "<div>" + html;
+    }
+  
+    html = html.replace(/\[([^\]]+)\]\(([^\)]+)\)/gm,function(match, p1, p2){
+      return "<a href='"+p2+"'>"+p1.replace(/\n/g, '')+"</a>";
+    });
+  
+    // This may seem crazy, but because JS doesn't have a look behind,
+    // we reverse the string to regex out the italic items (and bold)
+    // and look for something that doesn't start (or end in the reversed strings case)
+    // with a slash.
+    html = _.reverse(
+             _.reverse(html)
+             .replace(/_(?!\\)((_\\|[^_])*)_(?=$|[^\\])/gm, function(match, p1) {
+                return ">i/<"+ p1.replace(/\n/g, '').replace(/[\s]+$/,'') +">i<";
+             })
+             .replace(/\*\*(?!\\)((\*\*\\|[^\*\*])*)\*\*(?=$|[^\\])/gm, function(match, p1){
+                return ">b/<"+ p1.replace(/\n/g, '').replace(/[\s]+$/,'') +">b<";
+             })
+            );
+  
+    html =  html.replace(/^\> (.+)$/mg,"$1");
+  
+    // Use custom formatters toHTML functions (if any exist)
+    var formatName, format;
+    for(formatName in SirTrevor.Formatters) {
+      if (SirTrevor.Formatters.hasOwnProperty(formatName)) {
+        format = SirTrevor.Formatters[formatName];
+        // Do we have a toHTML function?
+        if (!_.isUndefined(format.toHTML) && _.isFunction(format.toHTML)) {
+          html = format.toHTML(html);
+        }
+      }
+    }
+  
+    // Use custom block toHTML functions (if any exist)
+    var block;
+    if (SirTrevor.Blocks.hasOwnProperty(type)) {
+      block = SirTrevor.Blocks[type];
+      // Do we have a toHTML function?
+      if (!_.isUndefined(block.prototype.toHTML) && _.isFunction(block.prototype.toHTML)) {
+        html = block.prototype.toHTML(html);
+      }
+    }
+  
+    if (shouldWrap) {
+      html = html.replace(/\n\n/gm, "</div><div><br></div><div>");
+      html = html.replace(/\n/gm, "</div><div>");
+    }
+  
+    html = html.replace(/\t/g, "&nbsp;&nbsp;&nbsp;&nbsp;")
+               .replace(/\n/g, "<br>")
+               .replace(/\*\*/, "")
+               .replace(/__/, "");  // Cleanup any markdown characters left
+  
+    // Replace escaped
+    html = html.replace(/\\\*/g, "*")
+               .replace(/\\\[/g, "[")
+               .replace(/\\\]/g, "]")
+               .replace(/\\\_/g, "_")
+               .replace(/\\\(/g, "(")
+               .replace(/\\\)/g, ")")
+               .replace(/\\\-/g, "-");
+  
+    if (shouldWrap) {
+      html += "</div>";
+    }
+  
+    return html;
+  };
+  SirTrevor.toMarkdown = function(content, type) {
+    type = _.classify(type);
+  
+    var markdown = content;
+  
+    //Normalise whitespace
+    markdown = markdown.replace(/&nbsp;/g," ");
+  
+    // First of all, strip any additional formatting
+    // MSWord, I'm looking at you, punk.
+    markdown = markdown.replace(/( class=(")?Mso[a-zA-Z]+(")?)/g, '')
+                       .replace(/<!--(.*?)-->/g, '')
+                       .replace(/\/\*(.*?)\*\//g, '')
+                       .replace(/<(\/)*(meta|link|span|\\?xml:|st1:|o:|font)(.*?)>/gi, '');
+  
+    var badTags = ['style', 'script', 'applet', 'embed', 'noframes', 'noscript'],
+        tagStripper, i;
+  
+    for (i = 0; i< badTags.length; i++) {
+      tagStripper = new RegExp('<'+badTags[i]+'.*?'+badTags[i]+'(.*?)>', 'gi');
+      markdown = markdown.replace(tagStripper, '');
+    }
+  
+    // Escape anything in here that *could* be considered as MD
+    // Markdown chars we care about: * [] _ () -
+    markdown = markdown.replace(/\*/g, "\\*")
+                      .replace(/\[/g, "\\[")
+                      .replace(/\]/g, "\\]")
+                      .replace(/\_/g, "\\_")
+                      .replace(/\(/g, "\\(")
+                      .replace(/\)/g, "\\)")
+                      .replace(/\-/g, "\\-");
+  
+    var inlineTags = ["em", "i", "strong", "b"];
+  
+    for (i = 0; i< inlineTags.length; i++) {
+      tagStripper = new RegExp('<'+inlineTags[i]+'><br></'+inlineTags[i]+'>', 'gi');
+      markdown = markdown.replace(tagStripper, '<br>');
+    }
+  
+    function replaceBolds(match, p1, p2){
+      if(_.isUndefined(p2)) { p2 = ''; }
+      return "**" + p1.replace(/<(.)?br(.)?>/g, '') + "**" + p2;
+    }
+  
+    function replaceItalics(match, p1, p2){
+      if(_.isUndefined(p2)) { p2 = ''; }
+      return "_" + p1.replace(/<(.)?br(.)?>/g, '') + "_" + p2;
+    }
+  
+    markdown = markdown.replace(/<(\w+)(?:\s+\w+="[^"]+(?:"\$[^"]+"[^"]+)?")*>\s*<\/\1>/gim, '') //Empty elements
+                        .replace(/\n/mg,"")
+                        .replace(/<a.*?href=[""'](.*?)[""'].*?>(.*?)<\/a>/gim, function(match, p1, p2){
+                          return "[" + p2.trim().replace(/<(.)?br(.)?>/g, '') + "]("+ p1 +")";
+                        }) // Hyperlinks
+                        .replace(/<strong>(?:\s*)(.*?)(\s)*?<\/strong>/gim, replaceBolds)
+                        .replace(/<b>(?:\s*)(.*?)(\s*)?<\/b>/gim, replaceBolds)
+                        .replace(/<em>(?:\s*)(.*?)(\s*)?<\/em>/gim, replaceItalics)
+                        .replace(/<i>(?:\s*)(.*?)(\s*)?<\/i>/gim, replaceItalics);
+  
+  
+    // Use custom formatters toMarkdown functions (if any exist)
+    var formatName, format;
+    for(formatName in SirTrevor.Formatters) {
+      if (SirTrevor.Formatters.hasOwnProperty(formatName)) {
+        format = SirTrevor.Formatters[formatName];
+        // Do we have a toMarkdown function?
+        if (!_.isUndefined(format.toMarkdown) && _.isFunction(format.toMarkdown)) {
+          markdown = format.toMarkdown(markdown);
+        }
+      }
+    }
+  
+    // Do our generic stripping out
+    markdown = markdown.replace(/([^<>]+)(<div>)/g,"$1\n$2")                                 // Divitis style line breaks (handle the first line)
+                   .replace(/<div><div>/g,'\n<div>')                                         // ^ (double opening divs with one close from Chrome)
+                   .replace(/(?:<div>)([^<>]+)(?:<div>)/g,"$1\n")                            // ^ (handle nested divs that start with content)
+                   .replace(/(?:<div>)(?:<br>)?([^<>]+)(?:<br>)?(?:<\/div>)/g,"$1\n")        // ^ (handle content inside divs)
+                   .replace(/<\/p>/g,"\n\n")                                               // P tags as line breaks
+                   .replace(/<(.)?br(.)?>/g,"\n")                                            // Convert normal line breaks
+                   .replace(/&lt;/g,"<").replace(/&gt;/g,">");                                 // Encoding
+  
+    // Use custom block toMarkdown functions (if any exist)
+    var block;
+    if (SirTrevor.Blocks.hasOwnProperty(type)) {
+      block = SirTrevor.Blocks[type];
+      // Do we have a toMarkdown function?
+      if (!_.isUndefined(block.prototype.toMarkdown) && _.isFunction(block.prototype.toMarkdown)) {
+        markdown = block.prototype.toMarkdown(markdown);
+      }
+    }
+  
+    // Strip remaining HTML
+    markdown = markdown.replace(/<\/?[^>]+(>|$)/g, "");
+  
+    return markdown;
+  };
+
+  SirTrevor.EventBus = _.extend({}, SirTrevor.Events);
+
+  /* Block Mixins */
+  SirTrevor.BlockMixins.Ajaxable = {
+  
+    mixinName: "Ajaxable",
+  
+    ajaxable: true,
+  
+    initializeAjaxable: function(){
+      this._queued = [];
+    },
+  
+    addQueuedItem: function(name, deffered) {
+      SirTrevor.log("Adding queued item for " + this.blockID + " called " + name);
+      this._queued.push({ name: name, deffered: deffered });
+    },
+  
+    removeQueuedItem: function(name) {
+      SirTrevor.log("Removing queued item for " + this.blockID + " called " + name);
+      this._queued = _.reject(this._queued, function(queued){ return queued.name == name; });
+    },
+  
+    hasItemsInQueue: function() {
+      return this._queued.length > 0;
+    },
+  
+    resolveAllInQueue: function() {
+      _.each(this._queued, function(item){
+        SirTrevor.log("Aborting queued request: " + item.name);
+        item.deffered.abort();
+      }, this);
+    }
+  
+  };
+  SirTrevor.BlockMixins.Controllable = {
+  
+    mixinName: "Controllable",
+  
+    initializeControllable: function() {
+      SirTrevor.log("Adding controllable to block " + this.blockID);
+      this.$control_ui = $('<div>', {'class': 'st-block__control-ui'});
+      _.each(
+        this.controls,
+        function(handler, cmd) {
+          // Bind configured handler to current block context
+          this.addUiControl(cmd, _.bind(handler, this));
+        },
+        this
+      );
+      this.$inner.append(this.$control_ui);
+    },
+  
+    getControlTemplate: function(cmd) {
+      return $("<a>",
+        { 'data-icon': cmd,
+          'class': 'st-icon st-block-control-ui-btn st-block-control-ui-btn--' + cmd
+        });
+    },
+  
+    addUiControl: function(cmd, handler) {
+      this.$control_ui.append(this.getControlTemplate(cmd));
+      this.$control_ui.on('click', '.st-block-control-ui-btn--' + cmd, handler);
+    }
+  };
+  /* Adds drop functionaltiy to this block */
+  
+  SirTrevor.BlockMixins.Droppable = {
+  
+    mixinName: "Droppable",
+    valid_drop_file_types: ['File', 'Files', 'text/plain', 'text/uri-list'],
+  
+    initializeDroppable: function() {
+      SirTrevor.log("Adding droppable to block " + this.blockID);
+  
+      this.drop_options = _.extend({}, SirTrevor.DEFAULTS.Block.drop_options, this.drop_options);
+  
+      var drop_html = $(_.template(this.drop_options.html,
+                        { block: this }));
+  
+      this.$editor.hide();
+      this.$inputs.append(drop_html);
+      this.$dropzone = drop_html;
+  
+      // Bind our drop event
+      this.$dropzone.dropArea()
+                    .bind('drop', _.bind(this._handleDrop, this));
+  
+      this.$inner.addClass('st-block__inner--droppable');
+    },
+  
+    _handleDrop: function(e) {
+      e.preventDefault();
+  
+      e = e.originalEvent;
+  
+      var el = $(e.target),
+          types = e.dataTransfer.types,
+          type, data = [];
+  
+      el.removeClass('st-dropzone--dragover');
+  
+      /*
+        Check the type we just received,
+        delegate it away to our blockTypes to process
+      */
+  
+      if (!_.isUndefined(types) &&
+        _.some(types, function(type){ return _.include(this.valid_drop_file_types, type); }, this)) {
+        this.onDrop(e.dataTransfer);
+      }
+  
+      SirTrevor.EventBus.trigger('block:content:dropped');
+    }
+  
+  };
+  SirTrevor.BlockMixins.Fetchable = {
+  
+    mixinName: "Fetchable",
+  
+    initializeFetchable: function(){
+      this.withMixin(SirTrevor.BlockMixins.Ajaxable);
+    },
+  
+    fetch: function(options, success, failure){
+      var uid = _.uniqueId(this.blockID + "_fetch"),
+          xhr = $.ajax(options);
+  
+      this.resetMessages();
+      this.addQueuedItem(uid, xhr);
+  
+      if(!_.isUndefined(success)) {
+        xhr.done(_.bind(success, this));
+      }
+  
+      if(!_.isUndefined(failure)) {
+        xhr.fail(_.bind(failure, this));
+      }
+  
+      xhr.always(_.bind(this.removeQueuedItem, this, uid));
+  
+      return xhr;
+    }
+  
+  };
+  SirTrevor.BlockMixins.Pastable = {
+  
+    mixinName: "Pastable",
+  
+    initializePastable: function() {
+      SirTrevor.log("Adding pastable to block " + this.blockID);
+  
+      this.paste_options = _.extend({}, SirTrevor.DEFAULTS.Block.paste_options, this.paste_options);
+      this.$inputs.append(_.template(this.paste_options.html, this));
+  
+      this.$('.st-paste-block')
+        .bind('click', function(){ $(this).select(); })
+        .bind('paste', this._handleContentPaste)
+        .bind('submit', this._handleContentPaste);
+    }
+  
+  };
+  SirTrevor.BlockMixins.Uploadable = {
+  
+    mixinName: "Uploadable",
+  
+    uploadsCount: 0,
+  
+    initializeUploadable: function() {
+      SirTrevor.log("Adding uploadable to block " + this.blockID);
+      this.withMixin(SirTrevor.BlockMixins.Ajaxable);
+  
+      this.upload_options = _.extend({}, SirTrevor.DEFAULTS.Block.upload_options, this.upload_options);
+      this.$inputs.append(_.template(this.upload_options.html, this));
+    },
+  
+    uploader: function(file, success, failure){
+      return SirTrevor.fileUploader(this, file, success, failure);
+    }
+  
+  };
+  SirTrevor.BlockPositioner = (function(){
+  
+    var template = [
+      "<div class='st-block-positioner__inner'>",
+      "<span class='st-block-positioner__selected-value'></span>",
+      "<select class='st-block-positioner__select'></select>",
+      "</div>"
+    ].join("\n");
+  
+    var BlockPositioner = function(block_element, instance_id) {
+      this.$block = block_element;
+      this.instanceID = instance_id;
+      this.total_blocks = 0;
+  
+      this._ensureElement();
+      this._bindFunctions();
+  
+      this.initialize();
+    };
+  
+    _.extend(BlockPositioner.prototype, FunctionBind, Renderable, {
+  
+      bound: ['onBlockCountChange', 'onSelectChange', 'toggle', 'show', 'hide'],
+  
+      className: 'st-block-positioner',
+      visibleClass: 'st-block-positioner--is-visible',
+  
+      initialize: function(){
+        this.$el.append(template);
+        this.$select = this.$('.st-block-positioner__select');
+  
+        this.$select.on('change', this.onSelectChange);
+  
+        SirTrevor.EventBus.on(this.instanceID + ":blocks:count_update", this.onBlockCountChange);
+      },
+  
+      onBlockCountChange: function(new_count) {
+        if (new_count != this.total_blocks) {
+          this.total_blocks = new_count;
+          this.renderPositionList();
+        }
+      },
+  
+      onSelectChange: function() {
+        var val = this.$select.val();
+        if (val !== 0) {
+          SirTrevor.EventBus.trigger(this.instanceID + ":blocks:change_position",
+                                     this.$block, val, (val == 1 ? 'before' : 'after'));
+          this.toggle();
+        }
+      },
+  
+      renderPositionList: function() {
+        var inner = "<option value='0'>" + i18n.t("general:position") + "</option>";
+        for(var i = 1; i <= this.total_blocks; i++) {
+          inner += "<option value="+i+">"+i+"</option>";
+        }
+        this.$select.html(inner);
+      },
+  
+      toggle: function() {
+        this.$select.val(0);
+        this.$el.toggleClass(this.visibleClass);
+      },
+  
+      show: function(){
+        this.$el.addClass(this.visibleClass);
+      },
+  
+      hide: function(){
+        this.$el.removeClass(this.visibleClass);
+      }
+  
+    });
+  
+    return BlockPositioner;
+  
+  })();
+  SirTrevor.BlockReorder = (function(){
+  
+    var BlockReorder = function(block_element) {
+      this.$block = block_element;
+  
+      this._ensureElement();
+      this._bindFunctions();
+  
+      this.initialize();
+    };
+  
+    _.extend(BlockReorder.prototype, FunctionBind, Renderable, {
+  
+      bound: ['onMouseDown', 'onClick', 'onDragStart', 'onDragEnd', 'onDrag', 'onDrop'],
+  
+      className: 'st-block-ui-btn st-block-ui-btn--reorder st-icon',
+      tagName: 'a',
+  
+      attributes: function() {
+        return {
+          'html': 'reorder',
+          'draggable': 'true',
+          'data-icon': 'move'
+        };
+      },
+  
+      initialize: function() {
+        this.$el.bind('mousedown touchstart', this.onMouseDown)
+                .bind('click', this.onClick)
+                .bind('dragstart', this.onDragStart)
+                .bind('dragend touchend', this.onDragEnd)
+                .bind('drag touchmove', this.onDrag);
+  
+        this.$block.dropArea()
+                   .bind('drop', this.onDrop);
+      },
+  
+      onMouseDown: function() {
+        SirTrevor.EventBus.trigger("block:reorder:down");
+      },
+  
+      onDrop: function(ev) {
+        ev.preventDefault();
+  
+        var dropped_on = this.$block,
+            item_id = ev.originalEvent.dataTransfer.getData("text/plain"),
+            block = $('#' + item_id);
+  
+        if (!_.isUndefined(item_id) &&
+          !_.isEmpty(block) &&
+          dropped_on.attr('id') != item_id &&
+          dropped_on.attr('data-instance') == block.attr('data-instance')
+        ) {
+          dropped_on.after(block);
+        }
+        SirTrevor.EventBus.trigger("block:reorder:dropped", item_id);
+      },
+  
+      onDragStart: function(ev) {
+        var btn = $(ev.currentTarget).parent();
+  
+        ev.originalEvent.dataTransfer.setDragImage(this.$block[0], btn.position().left, btn.position().top);
+        ev.originalEvent.dataTransfer.setData('Text', this.$block.attr('id'));
+  
+        SirTrevor.EventBus.trigger("block:reorder:dragstart");
+        this.$block.addClass('st-block--dragging');
+      },
+  
+      onDragEnd: function(ev) {
+        SirTrevor.EventBus.trigger("block:reorder:dragend");
+        this.$block.removeClass('st-block--dragging');
+      },
+  
+      onDrag: function(ev){},
+  
+      onClick: function() {
+      },
+  
+      render: function() {
+        return this;
+      }
+  
+    });
+  
+    return BlockReorder;
+  
+  })();
+  SirTrevor.BlockDeletion = (function(){
+  
+    var BlockDeletion = function() {
+      this._ensureElement();
+      this._bindFunctions();
+    };
+  
+    _.extend(BlockDeletion.prototype, FunctionBind, Renderable, {
+  
+      tagName: 'a',
+      className: 'st-block-ui-btn st-block-ui-btn--delete st-icon',
+  
+      attributes: {
+        html: 'delete',
+        'data-icon': 'bin'
+      }
+  
+    });
+  
+    return BlockDeletion;
+  
+  })();
+  var bestNameFromField = function(field) {
+    var msg = field.attr("data-st-name") || field.attr("name");
+  
+    if (!msg) {
+      msg = 'Field';
+    }
+  
+    return _.capitalize(msg);
+  };
+  
+  SirTrevor.BlockValidations = {
+  
+    errors: [],
+  
+    valid: function(){
+      this.performValidations();
+      return this.errors.length === 0;
+    },
+  
+    // This method actually does the leg work
+    // of running our validators and custom validators
+    performValidations: function() {
+      this.resetErrors();
+  
+      var required_fields = this.$('.st-required');
+      _.each(required_fields, this.validateField, this);
+      _.each(this.validations, this.runValidator, this);
+  
+      this.$el.toggleClass('st-block--with-errors', this.errors.length > 0);
+    },
+  
+    // Everything in here should be a function that returns true or false
+    validations: [],
+  
+    validateField: function(field) {
+      field = $(field);
+  
+      var content = field.attr('contenteditable') ? field.text() : field.val();
+  
+      if (content.length === 0) {
+        this.setError(field, i18n.t("errors:block_empty",
+                                   { name: bestNameFromField(field) }));
+      }
+    },
+  
+    runValidator: function(validator) {
+      if (!_.isUndefined(this[validator])) {
+        this[validator].call(this);
+      }
+    },
+  
+    setError: function(field, reason) {
+      var $msg = this.addMessage(reason, "st-msg--error");
+      field.addClass('st-error');
+  
+      this.errors.push({ field: field, reason: reason, msg: $msg });
+    },
+  
+    resetErrors: function() {
+      _.each(this.errors, function(error){
+        error.field.removeClass('st-error');
+        error.msg.remove();
+      });
+  
+      this.$messages.removeClass("st-block__messages--is-visible");
+      this.errors = [];
+    }
+  
+  };
+  SirTrevor.BlockStore = {
+  
+    blockStorage: {},
+  
+    createStore: function(blockData) {
+      this.blockStorage = {
+        type: _.underscored(this.type),
+        data: blockData || {}
+      };
+    },
+  
+    save: function() { this.toData(); },
+  
+    saveAndReturnData: function() {
+      this.save();
+      return this.blockStorage;
+    },
+  
+    saveAndGetData: function() {
+      var store = this.saveAndReturnData();
+      return store.data || store;
+    },
+  
+    getData: function() {
+      return this.blockStorage.data;
+    },
+  
+    setData: function(blockData) {
+      SirTrevor.log("Setting data for block " + this.blockID);
+      _.extend(this.blockStorage.data, blockData || {});
+    },
+  
+    setAndRetrieveData: function(blockData) {
+      this.setData(blockData);
+      return this.getData();
+    },
+  
+    setAndLoadData: function(blockData) {
+      this.setData(blockData);
+      this.beforeLoadingData();
+    },
+  
+    toData: function() {},
+    loadData: function() {},
+  
+    beforeLoadingData: function() {
+      SirTrevor.log("loadData for " + this.blockID);
+      SirTrevor.EventBus.trigger("editor/block/loadData");
+      this.loadData(this.getData());
+    },
+  
+    _loadData: function() {
+      SirTrevor.log("_loadData is deprecated and will be removed in the future. Please use beforeLoadingData instead.");
+      this.beforeLoadingData();
+    },
+  
+    checkAndLoadData: function() {
+      if (!_.isEmpty(this.getData())) {
+        this.beforeLoadingData();
+      }
+    }
+  
+  };
+  SirTrevor.SimpleBlock = (function(){
+  
+    var SimpleBlock = function(data, instance_id) {
+      this.createStore(data);
+      this.blockID = _.uniqueId('st-block-');
+      this.instanceID = instance_id;
+  
+      this._ensureElement();
+      this._bindFunctions();
+  
+      this.initialize.apply(this, arguments);
+    };
+  
+    _.extend(SimpleBlock.prototype, FunctionBind, SirTrevor.Events, Renderable, SirTrevor.BlockStore, {
+  
+      focus : function() {},
+  
+      valid : function() { return true; },
+  
+      className: 'st-block',
+  
+      block_template: _.template(
+        "<div class='st-block__inner'><%= editor_html %></div>"
+      ),
+  
+      attributes: function() {
+        return {
+          'id': this.blockID,
+          'data-type': this.type,
+          'data-instance': this.instanceID
+        };
+      },
+  
+      title: function() {
+        return _.titleize(this.type.replace(/[\W_]/g, ' '));
+      },
+  
+      blockCSSClass: function() {
+        this.blockCSSClass = _.to_slug(this.type);
+        return this.blockCSSClass;
+      },
+  
+      type: '',
+  
+      class: function() {
+        return _.classify(this.type);
+      },
+  
+      editorHTML: '',
+  
+      initialize: function() {},
+  
+      onBlockRender: function(){},
+      beforeBlockRender: function(){},
+  
+      _setBlockInner : function() {
+        var editor_html = _.result(this, 'editorHTML');
+  
+        this.$el.append(
+          this.block_template({ editor_html: editor_html })
+        );
+  
+        this.$inner = this.$el.find('.st-block__inner');
+        this.$inner.bind('click mouseover', function(e){ e.stopPropagation(); });
+      },
+  
+      render: function() {
+        this.beforeBlockRender();
+  
+        this._setBlockInner();
+        this._blockPrepare();
+  
+        return this;
+      },
+  
+      _blockPrepare : function() {
+        this._initUI();
+        this._initMessages();
+  
+        this.checkAndLoadData();
+  
+        this.$el.addClass('st-item-ready');
+        this.on("onRender", this.onBlockRender);
+        this.save();
+      },
+  
+      _withUIComponent: function(component, className, callback) {
+        this.$ui.append(component.render().$el);
+        (className && callback) && this.$ui.on('click', className, callback);
+      },
+  
+      _initUI : function() {
+        var ui_element = $("<div>", { 'class': 'st-block__ui' });
+        this.$inner.append(ui_element);
+        this.$ui = ui_element;
+        this._initUIComponents();
+      },
+  
+      _initMessages: function() {
+        var msgs_element = $("<div>", { 'class': 'st-block__messages' });
+        this.$inner.prepend(msgs_element);
+        this.$messages = msgs_element;
+      },
+  
+      addMessage: function(msg, additionalClass) {
+        var $msg = $("<span>", { html: msg, class: "st-msg " + additionalClass });
+        this.$messages.append($msg)
+                      .addClass('st-block__messages--is-visible');
+        return $msg;
+      },
+  
+      resetMessages: function() {
+        this.$messages.html('')
+                      .removeClass('st-block__messages--is-visible');
+      },
+  
+      _initUIComponents: function() {
+        this._withUIComponent(new SirTrevor.BlockReorder(this.$el));
+      }
+  
+    });
+  
+    SimpleBlock.fn = SimpleBlock.prototype;
+  
+    SimpleBlock.extend = extend; // Allow our Block to be extended.
+  
+    return SimpleBlock;
+  
+  })();
+  SirTrevor.Block = (function(){
+  
+    var Block = function(data, instance_id) {
+      SirTrevor.SimpleBlock.apply(this, arguments);
+    };
+  
+    var delete_template = [
+      "<div class='st-block__ui-delete-controls'>",
+        "<label class='st-block__delete-label'>",
+        "<%= i18n.t('general:delete') %>",
+        "</label>",
+        "<a class='st-block-ui-btn st-block-ui-btn--confirm-delete st-icon' data-icon='tick'></a>",
+        "<a class='st-block-ui-btn st-block-ui-btn--deny-delete st-icon' data-icon='close'></a>",
+      "</div>"
+    ].join("\n");
+  
+    var drop_options = {
+      html: ['<div class="st-block__dropzone">',
+             '<span class="st-icon"><%= _.result(block, "icon_name") %></span>',
+             '<p><%= i18n.t("general:drop", { block: "<span>" + _.result(block, "title") + "</span>" }) %>',
+             '</p></div>'].join('\n'),
+      re_render_on_reorder: false
+    };
+  
+    var paste_options = {
+      html: ['<input type="text" placeholder="<%= i18n.t("general:paste") %>"',
+             ' class="st-block__paste-input st-paste-block">'].join('')
+    };
+  
+    var upload_options = {
+      html: [
+        '<div class="st-block__upload-container">',
+        '<input type="file" type="st-file-upload">',
+        '<button class="st-upload-btn"><%= i18n.t("general:upload") %></button>',
+        '</div>'
+      ].join('\n')
+    };
+  
+    SirTrevor.DEFAULTS.Block = {
+      drop_options: drop_options,
+      paste_options: paste_options,
+      upload_options: upload_options
+    };
+  
+    _.extend(Block.prototype, SirTrevor.SimpleBlock.fn, SirTrevor.BlockValidations, {
+  
+      bound: ["_handleContentPaste", "_onFocus", "_onBlur", "onDrop", "onDeleteClick",
+              "clearInsertedStyles", "getSelectionForFormatter", "onBlockRender"],
+  
+      className: 'st-block st-icon--add',
+  
+      attributes: function() {
+        return _.extend(SirTrevor.SimpleBlock.fn.attributes.call(this), {
+          'data-icon-after' : "add"
+        });
+      },
+  
+      icon_name: 'default',
+  
+      validationFailMsg: function() {
+        return i18n.t('errors:validation_fail', { type: this.title() });
+      },
+  
+      editorHTML: '<div class="st-block__editor"></div>',
+  
+      toolbarEnabled: true,
+  
+      droppable: false,
+      pastable: false,
+      uploadable: false,
+      fetchable: false,
+      ajaxable: false,
+  
+      drop_options: {},
+      paste_options: {},
+      upload_options: {},
+  
+      formattable: true,
+  
+      _previousSelection: '',
+  
+      initialize: function() {},
+  
+      toMarkdown: function(markdown){ return markdown; },
+      toHTML: function(html){ return html; },
+  
+      withMixin: function(mixin) {
+        if (!_.isObject(mixin)) { return; }
+  
+        var initializeMethod = "initialize" + mixin.mixinName;
+  
+        if (_.isUndefined(this[initializeMethod])) {
+          _.extend(this, mixin);
+          this[initializeMethod]();
+        }
+      },
+  
+      render: function() {
+        this.beforeBlockRender();
+        this._setBlockInner();
+  
+        this.$editor = this.$inner.children().first();
+  
+        if(this.droppable || this.pastable || this.uploadable) {
+          var input_html = $("<div>", { 'class': 'st-block__inputs' });
+          this.$inner.append(input_html);
+          this.$inputs = input_html;
+        }
+  
+        if (this.hasTextBlock) { this._initTextBlocks(); }
+        if (this.droppable) { this.withMixin(SirTrevor.BlockMixins.Droppable); }
+        if (this.pastable) { this.withMixin(SirTrevor.BlockMixins.Pastable); }
+        if (this.uploadable) { this.withMixin(SirTrevor.BlockMixins.Uploadable); }
+        if (this.fetchable) { this.withMixin(SirTrevor.BlockMixins.Fetchable); }
+        if (this.controllable) { this.withMixin(SirTrevor.BlockMixins.Controllable); }
+  
+        if (this.formattable) { this._initFormatting(); }
+  
+        this._blockPrepare();
+  
+        return this;
+      },
+  
+      remove: function() {
+        if (this.ajaxable) {
+          this.resolveAllInQueue();
+        }
+  
+        this.$el.remove();
+      },
+  
+      loading: function() {
+        if(!_.isUndefined(this.spinner)) { this.ready(); }
+  
+        this.spinner = new Spinner(SirTrevor.DEFAULTS.spinner);
+        this.spinner.spin(this.$el[0]);
+  
+        this.$el.addClass('st--is-loading');
+      },
+  
+      ready: function() {
+        this.$el.removeClass('st--is-loading');
+        if (!_.isUndefined(this.spinner)) {
+          this.spinner.stop();
+          delete this.spinner;
+        }
+      },
+  
+      /*
+        Generic toData implementation.
+        Can be overwritten, although hopefully this will cover most situations
+      */
+      toData: function() {
+        SirTrevor.log("toData for " + this.blockID);
+  
+        var bl = this.$el,
+            dataObj = {};
+  
+        /* Simple to start. Add conditions later */
+        if (this.hasTextBlock()) {
+          var content = this.getTextBlock().html();
+          if (content.length > 0) {
+            dataObj.text = SirTrevor.toMarkdown(content, this.type);
+          }
+        }
+  
+        // Add any inputs to the data attr
+        if(this.$(':input').not('.st-paste-block').length > 0) {
+          this.$(':input').each(function(index,input){
+            if (input.getAttribute('name')) {
+              dataObj[input.getAttribute('name')] = input.value;
+            }
+          });
+        }
+  
+        // Set
+        if(!_.isEmpty(dataObj)) {
+          this.setData(dataObj);
+        }
+      },
+  
+      /* Generic implementation to tell us when the block is active */
+      focus: function() {
+        this.getTextBlock().focus();
+      },
+  
+      blur: function() {
+        this.getTextBlock().blur();
+      },
+  
+      onFocus: function() {
+        this.getTextBlock().bind('focus', this._onFocus);
+      },
+  
+      onBlur: function() {
+        this.getTextBlock().bind('blur', this._onBlur);
+      },
+  
+      /*
+      * Event handlers
+      */
+  
+      _onFocus: function() {
+        this.trigger('blockFocus', this.$el);
+      },
+  
+      _onBlur: function() {},
+  
+      onDrop: function(dataTransferObj) {},
+  
+      onDeleteClick: function(ev) {
+        ev.preventDefault();
+  
+        var onDeleteConfirm = function(e) {
+          e.preventDefault();
+          this.trigger('removeBlock', this.blockID);
+        };
+  
+        var onDeleteDeny = function(e) {
+          e.preventDefault();
+          this.$el.removeClass('st-block--delete-active');
+          $delete_el.remove();
+        };
+  
+        if (this.isEmpty()) {
+          onDeleteConfirm.call(this, new Event('click'));
+          return;
+        }
+  
+        this.$inner.append(_.template(delete_template));
+        this.$el.addClass('st-block--delete-active');
+  
+        var $delete_el = this.$inner.find('.st-block__ui-delete-controls');
+  
+        this.$inner.on('click', '.st-block-ui-btn--confirm-delete',
+                        _.bind(onDeleteConfirm, this))
+                   .on('click', '.st-block-ui-btn--deny-delete',
+                        _.bind(onDeleteDeny, this));
+      },
+  
+      pastedMarkdownToHTML: function(content) {
+        return SirTrevor.toHTML(SirTrevor.toMarkdown(content, this.type), this.type);
+      },
+  
+      onContentPasted: function(event, target){
+        target.html(this.pastedMarkdownToHTML(target[0].innerHTML));
+        this.getTextBlock().caretToEnd();
+      },
+  
+      beforeLoadingData: function() {
+        this.loading();
+  
+        if(this.droppable || this.uploadable || this.pastable) {
+          this.$editor.show();
+          this.$inputs.hide();
+        }
+  
+        SirTrevor.SimpleBlock.fn.beforeLoadingData.call(this);
+  
+        this.ready();
+      },
+  
+      _handleContentPaste: function(ev) {
+        var target = $(ev.currentTarget);
+  
+        _.delay(_.bind(this.onContentPasted, this, ev, target), 0);
+      },
+  
+      _getBlockClass: function() {
+        return 'st-block--' + this.className;
+      },
+  
+      /*
+      * Init functions for adding functionality
+      */
+  
+      _initUIComponents: function() {
+  
+        var positioner = new SirTrevor.BlockPositioner(this.$el, this.instanceID);
+  
+        this._withUIComponent(
+          positioner, '.st-block-ui-btn--reorder', positioner.toggle
+        );
+  
+        this._withUIComponent(
+          new SirTrevor.BlockReorder(this.$el)
+        );
+  
+        this._withUIComponent(
+          new SirTrevor.BlockDeletion(), '.st-block-ui-btn--delete', this.onDeleteClick
+        );
+  
+        this.onFocus();
+        this.onBlur();
+      },
+  
+      _initFormatting: function() {
+        // Enable formatting keyboard input
+        var formatter;
+        for (var name in SirTrevor.Formatters) {
+          if (SirTrevor.Formatters.hasOwnProperty(name)) {
+            formatter = SirTrevor.Formatters[name];
+            if (!_.isUndefined(formatter.keyCode)) {
+              formatter._bindToBlock(this.$el);
+            }
+          }
+        }
+      },
+  
+      _initTextBlocks: function() {
+        this.getTextBlock()
+          .bind('paste', this._handleContentPaste)
+          .bind('keyup', this.getSelectionForFormatter)
+          .bind('mouseup', this.getSelectionForFormatter)
+          .bind('DOMNodeInserted', this.clearInsertedStyles);
+      },
+  
+      getSelectionForFormatter: function() {
+        _.defer(function(){
+          var selection = window.getSelection(),
+             selectionStr = selection.toString().trim();
+  
+          if (selectionStr === '') {
+            SirTrevor.EventBus.trigger('formatter:hide');
+          } else {
+            SirTrevor.EventBus.trigger('formatter:positon');
+          }
+        });
+       },
+  
+      clearInsertedStyles: function(e) {
+        var target = e.target;
+        target.removeAttribute('style'); // Hacky fix for Chrome.
+      },
+  
+      hasTextBlock: function() {
+        return this.getTextBlock().length > 0;
+      },
+  
+      getTextBlock: function() {
+        if (_.isUndefined(this.text_block)) {
+          this.text_block = this.$('.st-text-block');
+        }
+  
+        return this.text_block;
+      },
+  
+      isEmpty: function() {
+        return _.isEmpty(this.saveAndGetData());
+      }
+  
+    });
+  
+    Block.extend = extend; // Allow our Block to be extended.
+  
+    return Block;
+  
+  })();
+  SirTrevor.Formatter = (function(){
+  
+    var Format = function(options){
+      this.formatId = _.uniqueId('format-');
+      this._configure(options || {});
+      this.initialize.apply(this, arguments);
+    };
+  
+    var formatOptions = ["title", "className", "cmd", "keyCode", "param", "onClick", "toMarkdown", "toHTML"];
+  
+    _.extend(Format.prototype, {
+  
+      title: '',
+      className: '',
+      cmd: null,
+      keyCode: null,
+      param: null,
+  
+      toMarkdown: function(markdown){ return markdown; },
+      toHTML: function(html){ return html; },
+  
+      initialize: function(){},
+  
+      _configure: function(options) {
+        if (this.options) options = _.extend({}, this.options, options);
+        for (var i = 0, l = formatOptions.length; i < l; i++) {
+          var attr = formatOptions[i];
+          if (options[attr]) this[attr] = options[attr];
+        }
+        this.options = options;
+      },
+  
+      isActive: function() {
+        return document.queryCommandState(this.cmd);
+      },
+  
+      _bindToBlock: function(block) {
+        var formatter = this,
+            ctrlDown = false;
+  
+        block
+          .on('keyup','.st-text-block', function(ev) {
+            if(ev.which == 17 || ev.which == 224 || ev.which == 91) {
+              ctrlDown = false;
+            }
+          })
+          .on('keydown','.st-text-block', { formatter: formatter }, function(ev) {
+            if(ev.which == 17 || ev.which == 224 || ev.which == 91) {
+              ctrlDown = true;
+            }
+  
+            if(ev.which == ev.data.formatter.keyCode && ctrlDown === true) {
+              document.execCommand(ev.data.formatter.cmd, false, true);
+              ev.preventDefault();
+              ctrlDown = false;
+            }
+          });
+      }
+    });
+  
+    Format.extend = extend; // Allow our Formatters to be extended.
+  
+    return Format;
+  
+  })();
+
+  /* Default Blocks */
+  /*
+    Block Quote
+  */
+  
+  SirTrevor.Blocks.Quote = (function(){
+  
+    var template = _.template([
+      '<blockquote class="st-required st-text-block" contenteditable="true"></blockquote>',
+      '<label class="st-input-label"> <%= i18n.t("blocks:quote:credit_field") %></label>',
+      '<input maxlength="140" name="cite" placeholder="<%= i18n.t("blocks:quote:credit_field") %>"',
+      ' class="st-input-string st-required js-cite-input" type="text" />'
+    ].join("\n"));
+  
+    return SirTrevor.Block.extend({
+  
+      type: "quote",
+  
+      title: function(){ return i18n.t('blocks:quote:title'); },
+  
+      icon_name: 'quote',
+  
+      editorHTML: function() {
+        return template(this);
+      },
+  
+      loadData: function(data){
+        this.getTextBlock().html(SirTrevor.toHTML(data.text, this.type));
+        this.$('.js-cite-input').val(data.cite);
+      },
+  
+      toMarkdown: function(markdown) {
+        return markdown.replace(/^(.+)$/mg,"> $1");
+      }
+  
+    });
+  
+  })();
+  /*
+    Heading Block
+  */
+  SirTrevor.Blocks.Heading = SirTrevor.Block.extend({
+  
+    type: 'Heading',
+  
+    title: function(){ return i18n.t('blocks:heading:title'); },
+  
+    editorHTML: '<div class="st-required st-text-block st-text-block--heading" contenteditable="true"></div>',
+  
+    icon_name: 'heading',
+  
+    loadData: function(data){
+      this.getTextBlock().html(SirTrevor.toHTML(data.text, this.type));
+    }
+  });
+  /*
+    Simple Image Block
+  */
+  
+  SirTrevor.Blocks.Image = SirTrevor.Block.extend({
+  
+    type: "image",
+    title: function() { return i18n.t('blocks:image:title'); },
+  
+    droppable: true,
+    uploadable: true,
+  
+    icon_name: 'image',
+  
+    loadData: function(data){
+      // Create our image tag
+      this.$editor.html($('<img>', { src: data.file.url }));
+    },
+  
+    onBlockRender: function(){
+      /* Setup the upload button */
+      this.$inputs.find('button').bind('click', function(ev){ ev.preventDefault(); });
+      this.$inputs.find('input').on('change', _.bind(function(ev){
+        this.onDrop(ev.currentTarget);
+      }, this));
+    },
+  
+    onDrop: function(transferData){
+      var file = transferData.files[0],
+          urlAPI = (typeof URL !== "undefined") ? URL : (typeof webkitURL !== "undefined") ? webkitURL : null;
+  
+      // Handle one upload at a time
+      if (/image/.test(file.type)) {
+        this.loading();
+        // Show this image on here
+        this.$inputs.hide();
+        this.$editor.html($('<img>', { src: urlAPI.createObjectURL(file) })).show();
+  
+        // Upload!
+        SirTrevor.EventBus.trigger('setSubmitButton', ['Please wait...']);
+        this.uploader(
+          file,
+          function(data) {
+            this.setData(data);
+            this.ready();
+          },
+          function(error){
+            this.addMessage(i18n.t('blocks:image:upload_error'));
+            this.ready();
+          }
+        );
+      }
+    }
+  });
+  /*
+    Text Block
+  */
+  SirTrevor.Blocks.Text = SirTrevor.Block.extend({
+  
+    type: "text",
+  
+    title: function() { return i18n.t('blocks:text:title'); },
+  
+    editorHTML: '<div class="st-required st-text-block" contenteditable="true"></div>',
+  
+    icon_name: 'text',
+  
+    loadData: function(data){
+      this.getTextBlock().html(SirTrevor.toHTML(data.text, this.type));
+    }
+  });
+  SirTrevor.Blocks.Tweet = (function(){
+  
+    var tweet_template = _.template([
+      "<blockquote class='twitter-tweet' align='center'>",
+      "<p><%= text %></p>",
+      "&mdash; <%= user.name %> (@<%= user.screen_name %>)",
+      "<a href='<%= status_url %>' data-datetime='<%= created_at %>'><%= created_at %></a>",
+      "</blockquote>",
+      '<script src="//platform.twitter.com/widgets.js" charset="utf-8"></script>'
+    ].join("\n"));
+  
+    return SirTrevor.Block.extend({
+  
+      type: "tweet",
+      droppable: true,
+      pastable: true,
+      fetchable: true,
+  
+      drop_options: {
+        re_render_on_reorder: true
+      },
+  
+      title: function(){ return i18n.t('blocks:tweet:title'); },
+  
+      fetchUrl: function(tweetID) {
+        return "/tweets/?tweet_id=" + tweetID;
+      },
+  
+      icon_name: 'twitter',
+  
+      loadData: function(data) {
+        if (_.isUndefined(data.status_url)) { data.status_url = ''; }
+        this.$inner.find('iframe').remove();
+        this.$inner.prepend(tweet_template(data));
+      },
+  
+      onContentPasted: function(event){
+        // Content pasted. Delegate to the drop parse method
+        var input = $(event.target),
+            val = input.val();
+  
+        // Pass this to the same handler as onDrop
+        this.handleTwitterDropPaste(val);
+      },
+  
+      handleTwitterDropPaste: function(url){
+        if (!this.validTweetUrl(url)) {
+          SirTrevor.log("Invalid Tweet URL");
+          return;
+        }
+  
+        // Twitter status
+        var tweetID = url.match(/[^\/]+$/);
+        if (!_.isEmpty(tweetID)) {
+          this.loading();
+          tweetID = tweetID[0];
+  
+          var ajaxOptions = {
+            url: this.fetchUrl(tweetID),
+            dataType: "json"
+          };
+  
+          this.fetch(ajaxOptions, this.onTweetSuccess, this.onTweetFail);
+        }
+      },
+  
+      validTweetUrl: function(url) {
+        return (_.isURI(url) &&
+                url.indexOf("twitter") !== -1 &&
+                url.indexOf("status") !== -1);
+      },
+  
+      onTweetSuccess: function(data) {
+        // Parse the twitter object into something a bit slimmer..
+        var obj = {
+          user: {
+            profile_image_url: data.user.profile_image_url,
+            profile_image_url_https: data.user.profile_image_url_https,
+            screen_name: data.user.screen_name,
+            name: data.user.name
+          },
+          id: data.id_str,
+          text: data.text,
+          created_at: data.created_at,
+          entities: data.entities,
+          status_url: "https://twitter.com/" + data.user.screen_name + "/status/" + data.id_str
+        };
+  
+        this.setAndLoadData(obj);
+        this.ready();
+      },
+  
+      onTweetFail: function() {
+        this.addMessage(i18n.t("blocks:tweet:fetch_error"));
+        this.ready();
+      },
+  
+      onDrop: function(transferData){
+        var url = transferData.getData('text/plain');
+        this.handleTwitterDropPaste(url);
+      }
+    });
+  
+  })();
+  /*
+    Unordered List
+  */
+  
+  SirTrevor.Blocks.List = (function() {
+  
+    var template = '<div class="st-text-block st-required" contenteditable="true"><ul><li></li></ul></div>';
+  
+    return SirTrevor.Block.extend({
+  
+      type: 'list',
+  
+      title: function() { return i18n.t('blocks:list:title'); },
+  
+      icon_name: 'list',
+  
+      editorHTML: function() {
+        return _.template(template, this);
+      },
+  
+      loadData: function(data){
+        this.getTextBlock().html("<ul>" + SirTrevor.toHTML(data.text, this.type) + "</ul>");
+      },
+  
+      onBlockRender: function() {
+        this.checkForList = _.bind(this.checkForList, this);
+        this.getTextBlock().on('click keyup', this.checkForList);
+      },
+  
+      checkForList: function() {
+        if (this.$('ul').length === 0) {
+          document.execCommand("insertUnorderedList", false, false);
+        }
+      },
+  
+      toMarkdown: function(markdown) {
+        return markdown.replace(/<\/li>/mg,"\n")
+                       .replace(/<\/?[^>]+(>|$)/g, "")
+                       .replace(/^(.+)$/mg," - $1");
+      },
+  
+      toHTML: function(html) {
+        html = html.replace(/^ - (.+)$/mg,"<li>$1</li>")
+                   .replace(/\n/mg, "");
+  
+        return html;
+      },
+  
+      onContentPasted: function(event, target) {
+        var replace = this.pastedMarkdownToHTML(target[0].innerHTML),
+            list = this.$('ul').html(replace);
+  
+        this.getTextBlock().caretToEnd();
+      },
+  
+      isEmpty: function() {
+        return _.isEmpty(this.saveAndGetData().text);
+      }
+  
+    });
+  
+  })();
+  SirTrevor.Blocks.Video = (function(){
+  
+    return SirTrevor.Block.extend({
+  
+      // more providers at https://gist.github.com/jeffling/a9629ae28e076785a14f
+      providers: {
+        vimeo: {
+          regex: /(?:http[s]?:\/\/)?(?:www.)?vimeo.com\/(.+)/,
+          html: "<iframe src=\"{{protocol}}//player.vimeo.com/video/{{remote_id}}?title=0&byline=0\" width=\"580\" height=\"320\" frameborder=\"0\"></iframe>"
+        },
+        youtube: {
+          regex: /(?:http[s]?:\/\/)?(?:www.)?(?:(?:youtube.com\/watch\?(?:.*)(?:v=))|(?:youtu.be\/))([^&].+)/,
+          html: "<iframe src=\"{{protocol}}//www.youtube.com/embed/{{remote_id}}\" width=\"580\" height=\"320\" frameborder=\"0\" allowfullscreen></iframe>"
+        }
+      },
+  
+      type: 'video',
+      title: function() { return i18n.t('blocks:video:title'); },
+  
+      droppable: true,
+      pastable: true,
+  
+      icon_name: 'video',
+  
+      loadData: function(data){
+        if (!this.providers.hasOwnProperty(data.source)) { return; }
+  
+        if (this.providers[data.source].square) {
+          this.$editor.addClass('st-block__editor--with-square-media');
+        } else {
+          this.$editor.addClass('st-block__editor--with-sixteen-by-nine-media');
+        }
+  
+        var embed_string = this.providers[data.source].html
+          .replace('{{protocol}}', window.location.protocol)
+          .replace('{{remote_id}}', data.remote_id)
+          .replace('{{width}}', this.$editor.width()); // for videos that can't resize automatically like vine
+  
+        this.$editor.html(embed_string);
+      },
+  
+      onContentPasted: function(event){
+        this.handleDropPaste($(event.target).val());
+      },
+  
+      handleDropPaste: function(url){
+        if(!_.isURI(url)) {
+          return;
+        }
+  
+        var match, data;
+  
+        _.each(this.providers, function(provider, index) {
+          match = provider.regex.exec(url);
+  
+          if(match !== null && !_.isUndefined(match[1])) {
+            data = {
+              source: index,
+              remote_id: match[1]
+            };
+  
+            this.setAndLoadData(data);
+          }
+        }, this);
+      },
+  
+      onDrop: function(transferData){
+        var url = transferData.getData('text/plain');
+        this.handleDropPaste(url);
+      }
+    });
+  
+  })();
+  /* Default Formatters */
+  /* Our base formatters */
+  (function(){
+  
+    var Bold = SirTrevor.Formatter.extend({
+      title: "bold",
+      cmd: "bold",
+      keyCode: 66,
+      text : "B"
+    });
+  
+    var Italic = SirTrevor.Formatter.extend({
+      title: "italic",
+      cmd: "italic",
+      keyCode: 73,
+      text : "i"
+    });
+  
+    var Link = SirTrevor.Formatter.extend({
+  
+      title: "link",
+      iconName: "link",
+      cmd: "CreateLink",
+      text : "link",
+  
+      onClick: function() {
+  
+        var link = prompt(i18n.t("general:link")),
+            link_regex = /((ftp|http|https):\/\/.)|mailto(?=\:[-\.\w]+@)/;
+  
+        if(link && link.length > 0) {
+  
+         if (!link_regex.test(link)) {
+           link = "http://" + link;
+         }
+  
+         document.execCommand(this.cmd, false, link);
+        }
+      },
+  
+      isActive: function() {
+        var selection = window.getSelection(),
+            node;
+  
+        if (selection.rangeCount > 0) {
+          node = selection.getRangeAt(0)
+                          .startContainer
+                          .parentNode;
+        }
+  
+        return (node && node.nodeName == "A");
+      }
+    });
+  
+    var UnLink = SirTrevor.Formatter.extend({
+      title: "unlink",
+      iconName: "link",
+      cmd: "unlink",
+      text : "link"
+    });
+  
+    /*
+      Create our formatters and add a static reference to them
+    */
+    SirTrevor.Formatters.Bold = new Bold();
+    SirTrevor.Formatters.Italic = new Italic();
+    SirTrevor.Formatters.Link = new Link();
+    SirTrevor.Formatters.Unlink = new UnLink();
+  
+  })();
+  /* Marker */
+  SirTrevor.BlockControl = (function(){
+  
+    var BlockControl = function(type, instance_scope) {
+      this.type = type;
+      this.instance_scope = instance_scope;
+      this.block_type = SirTrevor.Blocks[this.type].prototype;
+      this.can_be_rendered = this.block_type.toolbarEnabled;
+  
+      this._ensureElement();
+    };
+  
+    _.extend(BlockControl.prototype, FunctionBind, Renderable, SirTrevor.Events, {
+  
+      tagName: 'a',
+      className: "st-block-control",
+  
+      attributes: function() {
+        return {
+          'data-type': this.block_type.type
+        };
+      },
+  
+      render: function() {
+        this.$el.html('<span class="st-icon">'+ _.result(this.block_type, 'icon_name') +'</span>' + _.result(this.block_type, 'title'));
+        return this;
+      }
+    });
+  
+    return BlockControl;
+  
+  })();
+  /*
+    SirTrevor Block Controls
+    --
+    Gives an interface for adding new Sir Trevor blocks.
+  */
+  
+  SirTrevor.BlockControls = (function(){
+  
+    var BlockControls = function(available_types, instance_scope) {
+      this.instance_scope = instance_scope;
+      this.available_types = available_types || [];
+      this._ensureElement();
+      this._bindFunctions();
+      this.initialize();
+    };
+  
+    _.extend(BlockControls.prototype, FunctionBind, Renderable, SirTrevor.Events, {
+  
+      bound: ['handleControlButtonClick'],
+      block_controls: null,
+  
+      className: "st-block-controls",
+  
+      html: "<a class='st-icon st-icon--close'>" + i18n.t("general:close") + "</a>",
+  
+      initialize: function() {
+        for(var block_type in this.available_types) {
+          if (SirTrevor.Blocks.hasOwnProperty(block_type)) {
+            var block_control = new SirTrevor.BlockControl(block_type, this.instance_scope);
+            if (block_control.can_be_rendered) {
+              this.$el.append(block_control.render().$el);
+            }
+          }
+        }
+  
+        this.$el.delegate('.st-block-control', 'click', this.handleControlButtonClick);
+      },
+  
+      show: function() {
+        this.$el.addClass('st-block-controls--active');
+  
+        SirTrevor.EventBus.trigger('block:controls:shown');
+      },
+  
+      hide: function() {
+        this.$el.removeClass('st-block-controls--active');
+  
+        SirTrevor.EventBus.trigger('block:controls:hidden');
+      },
+  
+      handleControlButtonClick: function(e) {
+        e.stopPropagation();
+  
+        this.trigger('createBlock', $(e.currentTarget).attr('data-type'));
+      }
+  
+    });
+  
+    return BlockControls;
+  
+  })();
+  
+  
+  /*
+    SirTrevor Floating Block Controls
+    --
+    Draws the 'plus' between blocks
+  */
+  
+  SirTrevor.FloatingBlockControls = (function(){
+  
+    var FloatingBlockControls = function(wrapper, instance_id) {
+      this.$wrapper = wrapper;
+      this.instance_id = instance_id;
+  
+      this._ensureElement();
+      this._bindFunctions();
+  
+      this.initialize();
+    };
+  
+    _.extend(FloatingBlockControls.prototype, FunctionBind, Renderable, SirTrevor.Events, {
+  
+      className: "st-block-controls__top",
+  
+      attributes: function() {
+        return {
+          'data-icon': 'add'
+        };
+      },
+  
+      bound: ['handleBlockMouseOut', 'handleBlockMouseOver', 'handleBlockClick', 'onDrop'],
+  
+      initialize: function() {
+        this.$el.on('click', this.handleBlockClick)
+                .dropArea()
+                .bind('drop', this.onDrop);
+  
+        this.$wrapper.on('mouseover', '.st-block', this.handleBlockMouseOver)
+                     .on('mouseout', '.st-block', this.handleBlockMouseOut)
+                     .on('click', '.st-block--with-plus', this.handleBlockClick);
+      },
+  
+      onDrop: function(ev) {
+        ev.preventDefault();
+  
+        var dropped_on = this.$el,
+            item_id = ev.originalEvent.dataTransfer.getData("text/plain"),
+            block = $('#' + item_id);
+  
+        if (!_.isUndefined(item_id) &&
+          !_.isEmpty(block) &&
+          dropped_on.attr('id') != item_id &&
+          this.instance_id == block.attr('data-instance')
+        ) {
+          dropped_on.after(block);
+        }
+  
+        SirTrevor.EventBus.trigger("block:reorder:dropped", item_id);
+      },
+  
+      handleBlockMouseOver: function(e) {
+        var block = $(e.currentTarget);
+  
+        if (!block.hasClass('st-block--with-plus')) {
+          block.addClass('st-block--with-plus');
+        }
+      },
+  
+      handleBlockMouseOut: function(e) {
+        var block = $(e.currentTarget);
+  
+        if (block.hasClass('st-block--with-plus')) {
+          block.removeClass('st-block--with-plus');
+        }
+      },
+  
+      handleBlockClick: function(e) {
+        e.stopPropagation();
+  
+        var block = $(e.currentTarget);
+        this.trigger('showBlockControls', block);
+      }
+  
+    });
+  
+    return FloatingBlockControls;
+  
+  })();
+  /* FormatBar */
+  /*
+    Format Bar
+    --
+    Displayed on focus on a text area.
+    Renders with all available options for the editor instance
+  */
+  
+  SirTrevor.FormatBar = (function(){
+  
+    var FormatBar = function(options) {
+      this.options = _.extend({}, SirTrevor.DEFAULTS.formatBar, options || {});
+      this._ensureElement();
+      this._bindFunctions();
+  
+      this.initialize.apply(this, arguments);
+    };
+  
+    _.extend(FormatBar.prototype, FunctionBind, SirTrevor.Events, Renderable, {
+  
+      className: 'st-format-bar',
+  
+      bound: ["onFormatButtonClick", "renderBySelection", "hide"],
+  
+      initialize: function() {
+        var formatName, format, btn;
+        this.$btns = [];
+  
+        for (formatName in SirTrevor.Formatters) {
+          if (SirTrevor.Formatters.hasOwnProperty(formatName)) {
+            format = SirTrevor.Formatters[formatName];
+            btn = $("<button>", {
+                    'class': 'st-format-btn st-format-btn--' + formatName + ' ' + (format.iconName ? 'st-icon' : ''),
+                    'text': format.text,
+                    'data-type': formatName,
+                    'data-cmd': format.cmd
+                  });
+  
+            this.$btns.push(btn);
+            btn.appendTo(this.$el);
+          }
+        }
+  
+        this.$b = $(document);
+        this.$el.bind('click', '.st-format-btn', this.onFormatButtonClick);
+      },
+  
+      hide: function() {
+        this.$el.removeClass('st-format-bar--is-ready');
+      },
+  
+      show: function() {
+        this.$el.addClass('st-format-bar--is-ready');
+      },
+  
+      remove: function(){ this.$el.remove(); },
+  
+      renderBySelection: function(rectangles) {
+  
+        var selection = window.getSelection(),
+            range = selection.getRangeAt(0),
+            boundary = range.getBoundingClientRect(),
+            coords = {};
+  
+        coords.top = boundary.top + 20 + window.pageYOffset - this.$el.height() + 'px';
+        coords.left = ((boundary.left + boundary.right) / 2) - (this.$el.width() / 2) + 'px';
+  
+        this.highlightSelectedButtons();
+        this.show();
+  
+        this.$el.css(coords);
+      },
+  
+      highlightSelectedButtons: function() {
+        var formatter;
+        _.each(this.$btns, function($btn) {
+          formatter = SirTrevor.Formatters[$btn.attr('data-type')];
+          $btn.toggleClass("st-format-btn--is-active",
+                           formatter.isActive());
+        }, this);
+      },
+  
+      onFormatButtonClick: function(ev){
+        ev.stopPropagation();
+  
+        var btn = $(ev.target),
+            format = SirTrevor.Formatters[btn.attr('data-type')];
+  
+        if (_.isUndefined(format)) return false;
+  
+        // Do we have a click function defined on this formatter?
+        if(!_.isUndefined(format.onClick) && _.isFunction(format.onClick)) {
+          format.onClick(); // Delegate
+        } else {
+          // Call default
+          document.execCommand(btn.attr('data-cmd'), false, format.param);
+        }
+  
+        this.highlightSelectedButtons();
+        return false;
+      }
+  
+    });
+  
+    return FormatBar;
+  
+  })();
+  /*
+    Sir Trevor Editor
+    --
+    Represents one Sir Trevor editor instance (with multiple blocks)
+    Each block references this instance.
+    BlockTypes are global however.
+  */
+  
+  SirTrevor.Editor = (function(){
+  
+    var SirTrevorEditor = function(options) {
+      this.initialize(options);
+    };
+  
+    _.extend(SirTrevorEditor.prototype, FunctionBind, SirTrevor.Events, {
+  
+      bound: ['onFormSubmit', 'showBlockControls', 'hideAllTheThings', 'hideBlockControls',
+              'onNewBlockCreated', 'changeBlockPosition', 'onBlockDragStart', 'onBlockDragEnd',
+              'removeBlockDragOver', 'onBlockDropped', 'createBlock'],
+  
+      events: {
+        'block:reorder:down':       'hideBlockControls',
+        'block:reorder:dragstart':  'onBlockDragStart',
+        'block:reorder:dragend':    'onBlockDragEnd',
+        'block:content:dropped':    'removeBlockDragOver',
+        'block:reorder:dropped':    'onBlockDropped',
+        'block:create:new':         'onNewBlockCreated'
+      },
+  
+      initialize: function(options) {
+        SirTrevor.log("Init SirTrevor.Editor");
+  
+        this.blockTypes = {};
+        this.blockCounts = {}; // Cached block type counts
+        this.blocks = []; // Block references
+        this.errors = [];
+        this.options = _.extend({}, SirTrevor.DEFAULTS, options || {});
+        this.ID = _.uniqueId('st-editor-');
+  
+        if (!this._ensureAndSetElements()) { return false; }
+  
+        if(!_.isUndefined(this.options.onEditorRender) && _.isFunction(this.options.onEditorRender)) {
+          this.onEditorRender = this.options.onEditorRender;
+        }
+  
+        this._setRequired();
+        this._setBlocksTypes();
+        this._bindFunctions();
+  
+        this.store("create");
+        this.build();
+  
+        SirTrevor.instances.push(this);
+        SirTrevor.bindFormSubmit(this.$form);
+      },
+  
+      /*
+        Build the Editor instance.
+        Check to see if we've been passed JSON already, and if not try and create a default block.
+        If we have JSON then we need to build all of our blocks from this.
+      */
+      build: function() {
+        this.$el.hide();
+  
+        this.block_controls = new SirTrevor.BlockControls(this.blockTypes, this.ID);
+        this.fl_block_controls = new SirTrevor.FloatingBlockControls(this.$wrapper, this.ID);
+        this.formatBar = new SirTrevor.FormatBar(this.options.formatBar);
+  
+        this.listenTo(this.block_controls, 'createBlock', this.createBlock);
+        this.listenTo(this.fl_block_controls, 'showBlockControls', this.showBlockControls);
+  
+        this._setEvents();
+  
+        SirTrevor.EventBus.on(this.ID + ":blocks:change_position", this.changeBlockPosition);
+        SirTrevor.EventBus.on("formatter:positon", this.formatBar.renderBySelection);
+        SirTrevor.EventBus.on("formatter:hide", this.formatBar.hide);
+  
+        this.$wrapper.prepend(this.fl_block_controls.render().$el);
+        $(document.body).append(this.formatBar.render().$el);
+        this.$outer.append(this.block_controls.render().$el);
+  
+        $(window).bind('click', this.hideAllTheThings);
+  
+        var store = this.store("read");
+  
+        if (store.data.length > 0) {
+          _.each(store.data, function(block){
+            SirTrevor.log('Creating: ' + block.type);
+            this.createBlock(block.type, block.data);
+          }, this);
+        } else if (this.options.defaultType !== false) {
+          this.createBlock(this.options.defaultType, {});
+        }
+  
+        this.$wrapper.addClass('st-ready');
+  
+        if(!_.isUndefined(this.onEditorRender)) {
+          this.onEditorRender();
+        }
+      },
+  
+      destroy: function() {
+        // Destroy the rendered sub views
+        this.formatBar.destroy();
+        this.fl_block_controls.destroy();
+        this.block_controls.destroy();
+  
+        // Destroy all blocks
+        _.each(this.blocks, function(block) {
+          this.removeBlock(block.blockID);
+        }, this);
+  
+        // Stop listening to events
+        this.stopListening();
+  
+        // Cleanup element
+        var el = this.$el.detach();
+  
+        // Remove instance
+        SirTrevor.instances = _.reject(SirTrevor.instances, _.bind(function(instance) {
+          return instance.ID == this.ID;
+        }, this));
+  
+        // Clear the store
+        this.store("reset");
+  
+        this.$outer.replaceWith(el);
+      },
+  
+      reinitialize: function(options) {
+        this.destroy();
+        this.initialize(options || this.options);
+      },
+  
+      _setEvents: function() {
+        _.each(this.events, function(callback, type) {
+          SirTrevor.EventBus.on(type, this[callback], this);
+        }, this);
+      },
+  
+      hideAllTheThings: function(e) {
+        this.block_controls.hide();
+        this.formatBar.hide();
+  
+        if (!_.isUndefined(this.block_controls.current_container)) {
+          this.block_controls.current_container.removeClass("with-st-controls");
+        }
+      },
+  
+      showBlockControls: function(container) {
+        if (!_.isUndefined(this.block_controls.current_container)) {
+          this.block_controls.current_container.removeClass("with-st-controls");
+        }
+  
+        this.block_controls.show();
+  
+        container.append(this.block_controls.$el.detach());
+        container.addClass('with-st-controls');
+  
+        this.block_controls.current_container = container;
+      },
+  
+      store: function(method, options){
+        return SirTrevor.editorStore(this, method, options || {});
+      },
+  
+      /*
+        Create an instance of a block from an available type.
+        We have to check the number of blocks we're allowed to create before adding one and handle fails accordingly.
+        A block will have a reference to an Editor instance & the parent BlockType.
+        We also have to remember to store static counts for how many blocks we have, and keep a nice array of all the blocks available.
+      */
+      createBlock: function(type, data, render_at) {
+        type = _.classify(type);
+  
+        if(this._blockLimitReached()) {
+          SirTrevor.log("Cannot add any more blocks. Limit reached.");
+          return false;
+        }
+  
+        if (!this._isBlockTypeAvailable(type)) {
+          SirTrevor.log("Block type not available " + type);
+          return false;
+        }
+  
+        // Can we have another one of these blocks?
+        if (!this._canAddBlockType(type)) {
+          SirTrevor.log("Block Limit reached for type " + type);
+          return false;
+        }
+  
+        var block = new SirTrevor.Blocks[type](data, this.ID);
+  
+        this._renderInPosition(block.render().$el);
+  
+        this.listenTo(block, 'removeBlock', this.removeBlock);
+  
+        this.blocks.push(block);
+        this._incrementBlockTypeCount(type);
+  
+        block.focus();
+  
+        SirTrevor.EventBus.trigger(data ? "block:create:existing" : "block:create:new", block);
+        SirTrevor.log("Block created of type " + type);
+        block.trigger("onRender");
+  
+        this.$wrapper.toggleClass('st--block-limit-reached', this._blockLimitReached());
+        this.triggerBlockCountUpdate();
+      },
+  
+      onNewBlockCreated: function(block) {
+        this.hideBlockControls();
+        this.scrollTo(block.$el);
+      },
+  
+      scrollTo: function(element) {
+        $('html, body').animate({ scrollTop: element.position().top }, 300, "linear");
+      },
+  
+      blockFocus: function(block) {
+        this.block_controls.current_container = null;
+      },
+  
+      hideBlockControls: function() {
+        if (!_.isUndefined(this.block_controls.current_container)) {
+          this.block_controls.current_container.removeClass("with-st-controls");
+        }
+  
+        this.block_controls.hide();
+      },
+  
+      removeBlockDragOver: function() {
+        this.$outer.find('.st-drag-over').removeClass('st-drag-over');
+      },
+  
+      triggerBlockCountUpdate: function() {
+        SirTrevor.EventBus.trigger(this.ID + ":blocks:count_update", this.blocks.length);
+      },
+  
+      changeBlockPosition: function($block, selectedPosition) {
+        selectedPosition = selectedPosition - 1;
+  
+        var blockPosition = this.getBlockPosition($block);
+        var $blockBy = this.$wrapper.find('.st-block').eq(selectedPosition);
+        var blockByPosition = this.getBlockPosition($blockBy);
+  
+        var where = (blockPosition > selectedPosition) ? "Before" : "After";
+  
+        if($blockBy && $blockBy.attr('id') !== $block.attr('id')) {
+          this.hideAllTheThings();
+          $block["insert" + where]($blockBy);
+          this.scrollTo($block);
+        }
+      },
+  
+      onBlockDropped: function(block_id) {
+        this.hideAllTheThings();
+        var block = this.findBlockById(block_id);
+        if (!_.isUndefined(block) &&
+            !_.isEmpty(block.getData()) &&
+            block.drop_options.re_render_on_reorder) {
+          block.beforeLoadingData();
+        }
+      },
+  
+      onBlockDragStart: function() {
+        this.hideBlockControls();
+        this.$wrapper.addClass("st-outer--is-reordering");
+      },
+  
+      onBlockDragEnd: function() {
+        this.removeBlockDragOver();
+        this.$wrapper.removeClass("st-outer--is-reordering");
+      },
+  
+      _renderInPosition: function(block) {
+        if (this.block_controls.current_container) {
+          this.block_controls.current_container.after(block);
+        } else {
+          this.$wrapper.append(block);
+        }
+      },
+  
+      _incrementBlockTypeCount: function(type) {
+        this.blockCounts[type] = (_.isUndefined(this.blockCounts[type])) ? 1: this.blockCounts[type] + 1;
+      },
+  
+      _getBlockTypeCount: function(type) {
+        return (_.isUndefined(this.blockCounts[type])) ? 0 : this.blockCounts[type];
+      },
+  
+      _canAddBlockType: function(type) {
+        var block_type_limit = this._getBlockTypeLimit(type);
+  
+        return !(block_type_limit !== 0 && this._getBlockTypeCount(type) >= block_type_limit);
+      },
+  
+      _blockLimitReached: function() {
+        return (this.options.blockLimit !== 0 && this.blocks.length >= this.options.blockLimit);
+      },
+  
+      removeBlock: function(block_id) {
+        var block = this.findBlockById(block_id),
+            type = _.classify(block.type),
+            controls = block.$el.find('.st-block-controls');
+  
+        if (controls.length) {
+          this.block_controls.hide();
+          this.$wrapper.prepend(controls);
+        }
+  
+        this.blockCounts[type] = this.blockCounts[type] - 1;
+        this.blocks = _.reject(this.blocks, function(item){ return (item.blockID == block.blockID); });
+        this.stopListening(block);
+  
+        block.remove();
+  
+        SirTrevor.EventBus.trigger("block:remove");
+        this.triggerBlockCountUpdate();
+  
+        this.$wrapper.toggleClass('st--block-limit-reached', this._blockLimitReached());
+      },
+  
+      performValidations : function(block, should_validate) {
+        var errors = 0;
+  
+        if (!SirTrevor.SKIP_VALIDATION && should_validate) {
+          if(!block.valid()){
+            this.errors.push({ text: _.result(block, 'validationFailMsg') });
+            SirTrevor.log("Block " + block.blockID + " failed validation");
+            ++errors;
+          }
+        }
+  
+        return errors;
+      },
+  
+      saveBlockStateToStore: function(block) {
+        var store = block.saveAndReturnData();
+        if(store && !_.isEmpty(store.data)) {
+          SirTrevor.log("Adding data for block " + block.blockID + " to block store");
+          this.store("add", { data: store });
+        }
+      },
+  
+      /*
+        Handle a form submission of this Editor instance.
+        Validate all of our blocks, and serialise all data onto the JSON objects
+      */
+      onFormSubmit: function(should_validate) {
+        // if undefined or null or anything other than false - treat as true
+        should_validate = (should_validate === false) ? false : true;
+  
+        SirTrevor.log("Handling form submission for Editor " + this.ID);
+  
+        this.removeErrors();
+        this.store("reset");
+  
+        this.validateBlocks(should_validate);
+        this.validateBlockTypesExist(should_validate);
+  
+        this.renderErrors();
+        this.store("save");
+  
+        return this.errors.length;
+      },
+  
+      validateBlocks: function(should_validate) {
+        if (!this.required && (SirTrevor.SKIP_VALIDATION && !should_validate)) {
+          return false;
+        }
+  
+        var blockIterator = function(block,index) {
+          var _block = _.find(this.blocks, function(b) {
+            return (b.blockID == $(block).attr('id')); });
+  
+          if (_.isUndefined(_block)) { return false; }
+  
+          // Find our block
+          this.performValidations(_block, should_validate);
+          this.saveBlockStateToStore(_block);
+        };
+  
+        _.each(this.$wrapper.find('.st-block'), blockIterator, this);
+      },
+  
+      validateBlockTypesExist: function(should_validate) {
+        if (!this.required && (SirTrevor.SKIP_VALIDATION && !should_validate)) {
+          return false;
+        }
+  
+        var blockTypeIterator = function(type, index) {
+          if (!this._isBlockTypeAvailable(type)) { return; }
+  
+          if (this._getBlockTypeCount(type) === 0) {
+            SirTrevor.log("Failed validation on required block type " + type);
+            this.errors.push({ text: i18n.t("errors:type_missing", { type: type }) });
+          } else {
+            var blocks = _.filter(this.getBlocksByType(type), function(b) {
+              return !b.isEmpty();
+            });
+  
+            if (blocks.length > 0) { return false; }
+  
+            this.errors.push({ text: i18n.t("errors:required_type_empty", { type: type }) });
+            SirTrevor.log("A required block type " + type + " is empty");
+          }
+        };
+  
+        if (_.isArray(this.required)) {
+          _.each(this.required, blockTypeIterator, this);
+        }
+      },
+  
+      renderErrors: function() {
+        if (this.errors.length === 0) { return false; }
+  
+        if (_.isUndefined(this.$errors)) {
+          this.$errors = this._errorsContainer();
+        }
+  
+        var str = "<ul>";
+  
+        _.each(this.errors, function(error) {
+          str += '<li class="st-errors__msg">'+ error.text +'</li>';
+        });
+  
+        str += "</ul>";
+  
+        this.$errors.append(str);
+        this.$errors.show();
+      },
+  
+      _errorsContainer: function() {
+        if (_.isUndefined(this.options.errorsContainer)) {
+          var $container = $("<div>", {
+            'class': 'st-errors',
+            html: "<p>" + i18n.t("errors:title") + " </p>"
+          });
+  
+          this.$outer.prepend($container);
+          return $container;
+        }
+  
+        return $element(this.options.errorsContainer);
+      },
+  
+      removeErrors: function() {
+        if (this.errors.length === 0) { return false; }
+  
+        this.$errors.hide().find('ul').html('');
+  
+        this.errors = [];
+      },
+  
+      findBlockById: function(block_id) {
+        return _.find(this.blocks, function(b){ return b.blockID == block_id; });
+      },
+  
+      getBlocksByType: function(block_type) {
+        return _.filter(this.blocks, function(b){ return _.classify(b.type) == block_type; });
+      },
+  
+      getBlocksByIDs: function(block_ids) {
+        return _.filter(this.blocks, function(b){ return _.contains(block_ids, b.blockID); });
+      },
+  
+      getBlockPosition: function($block) {
+        return this.$wrapper.find('.st-block').index($block);
+      },
+  
+      /*
+        Get Block Type Limit
+        --
+        returns the limit for this block, which can be set on a per Editor instance, or on a global blockType scope.
+      */
+      _getBlockTypeLimit: function(t) {
+        if (!this._isBlockTypeAvailable(t)) { return 0; }
+  
+        return parseInt((_.isUndefined(this.options.blockTypeLimits[t])) ? 0 : this.options.blockTypeLimits[t], 10);
+      },
+  
+      /*
+        Availability helper methods
+        --
+        Checks if the object exists within the instance of the Editor.
+      */
+      _isBlockTypeAvailable: function(t) {
+        return !_.isUndefined(this.blockTypes[t]);
+      },
+  
+      _ensureAndSetElements: function() {
+        if(_.isUndefined(this.options.el) || _.isEmpty(this.options.el)) {
+          SirTrevor.log("You must provide an el");
+          return false;
+        }
+  
+        this.$el = this.options.el;
+        this.el = this.options.el[0];
+        this.$form = this.$el.parents('form');
+  
+        var $outer = $("<div>").attr({ 'id': this.ID, 'class': 'st-outer', 'dropzone': 'copy link move' });
+        var $wrapper = $("<div>").attr({ 'class': 'st-blocks' });
+  
+        // Wrap our element in lots of containers *eww*
+        this.$el.wrap($outer).wrap($wrapper);
+  
+        this.$outer = this.$form.find('#' + this.ID);
+        this.$wrapper = this.$outer.find('.st-blocks');
+  
+        return true;
+      },
+  
+      /*
+        Set our blockTypes
+        These will either be set on a per Editor instance, or set on a global scope.
+      */
+      _setBlocksTypes: function() {
+        this.blockTypes = _.flattern((_.isUndefined(this.options.blockTypes)) ? SirTrevor.Blocks : this.options.blockTypes);
+      },
+  
+      /* Get our required blocks (if any) */
+      _setRequired: function() {
+        if (_.isArray(this.options.required) && !_.isEmpty(this.options.required)) {
+          this.required = this.options.required;
+        } else {
+          this.required = false;
+        }
+      }
+    });
+  
+    return SirTrevorEditor;
+  
+  })();
+  
+
+  /* We need a form handler here to handle all the form submits */
+  SirTrevor.setDefaults = function(options) {
+    SirTrevor.DEFAULTS = _.extend(SirTrevor.DEFAULTS, options || {});
+  };
+
+  SirTrevor.bindFormSubmit = function(form) {
+    if (!formBound) {
+      SirTrevor.submittable();
+      form.bind('submit', this.onFormSubmit);
+      formBound = true;
+    }
+  };
+
+  SirTrevor.onBeforeSubmit = function(should_validate) {
+    // Loop through all of our instances and do our form submits on them
+    var errors = 0;
+    _.each(SirTrevor.instances, function(inst, i) {
+      errors += inst.onFormSubmit(should_validate);
+    });
+    SirTrevor.log("Total errors: " + errors);
+
+    return errors;
+  };
+
+  SirTrevor.onFormSubmit = function(ev) {
+    var errors = SirTrevor.onBeforeSubmit();
+
+    if(errors > 0) {
+      SirTrevor.EventBus.trigger("onError");
+      ev.preventDefault();
+    }
+  };
+
+  SirTrevor.getInstance = function(identifier) {
+    if (_.isUndefined(identifier)) {
+      return this.instances[0];
+    }
+
+    if (_.isString(identifier)) {
+      return _.find(this.instances,
+        function(editor){ return editor.ID === identifier; });
+    }
+
+    return this.instances[identifier];
+  };
+
+  SirTrevor.setBlockOptions = function(type, options) {
+    var block = SirTrevor.Blocks[type];
+
+    if (_.isUndefined(block)) {
+      return;
+    }
+
+    _.extend(block.prototype, options || {});
+  };
+
+  SirTrevor.runOnAllInstances = function(method) {
+    if (_.has(SirTrevor.Editor.prototype, method)) {
+      // augment the arguments pseudo array and pass on to invoke()
+      // this allows us to pass arguments on to the target methods
+      [].unshift.call(arguments, SirTrevor.instances);
+      _.invoke.apply(_, arguments);
+    } else {
+      SirTrevor.log("method doesn't exist");
+    }
+  };
+
+}(jQuery, _));
+
+},{}],7:[function(require,module,exports){
 var jQuery = window.jQuery;
 var L = require('../bower_components/leaflet/dist/leaflet');
 
@@ -1716,7 +5080,7 @@ var Router = require('./router');
 App.Router = new Router;
 Backbone.history.start();
 
-},{"../bower_components/Sharrre/jquery.sharrre.min":1,"../bower_components/backbone/backbone":2,"../bower_components/leaflet/dist/leaflet":3,"../bower_components/responsive/build/responsive.min":4,"./router":11,"./view/GroupLayer":12,"./view/Poi":13,"./view/Theme":14}],6:[function(require,module,exports){
+},{"../bower_components/Sharrre/jquery.sharrre.min":2,"../bower_components/backbone/backbone":3,"../bower_components/leaflet/dist/leaflet":4,"../bower_components/responsive/build/responsive.min":5,"./router":13,"./view/GroupLayer":14,"./view/Poi":15,"./view/Theme":16}],8:[function(require,module,exports){
 var Backbone = window.Backbone;
 var LayerModel = require('../model/Layer');
 
@@ -1724,7 +5088,7 @@ module.exports = Backbone.Collection.extend({
     model: LayerModel
 });
 
-},{"../model/Layer":8}],7:[function(require,module,exports){
+},{"../model/Layer":10}],9:[function(require,module,exports){
 var Backbone = window.Backbone;
 var LayerCollection = require('../collection/Layer');
 
@@ -1739,7 +5103,7 @@ module.exports = Backbone.Model.extend({
         url: '/groups'
     });
 
-},{"../collection/Layer":6}],8:[function(require,module,exports){
+},{"../collection/Layer":8}],10:[function(require,module,exports){
 var Backbone = window.Backbone;
 
 module.exports = Backbone.Model.extend({
@@ -1751,7 +5115,7 @@ module.exports = Backbone.Model.extend({
     idAttribute: "_id",
     urlRoot: '/layer'
 });
-},{}],9:[function(require,module,exports){
+},{}],11:[function(require,module,exports){
 var Backbone = window.Backbone;
 
 module.exports = Backbone.Model.extend({
@@ -1764,7 +5128,7 @@ module.exports = Backbone.Model.extend({
     urlRoot: '/poi'
 });
 
-},{}],10:[function(require,module,exports){
+},{}],12:[function(require,module,exports){
 var Backbone = window.Backbone;
 var LayerCollection = require('../collection/Layer');
 
@@ -1778,10 +5142,13 @@ module.exports = Backbone.Model.extend({
         url: '/themes/active'
     });
 
-},{"../collection/Layer":6}],11:[function(require,module,exports){
+},{"../collection/Layer":8}],13:[function(require,module,exports){
 var App = window.App || {};
 
-var _ = require('underscore');
+window._ = require('underscore');
+window.Eventable = require('../bower_components/Eventable/eventable');
+require('../bower_components/sir-trevor-js/sir-trevor');
+
 var L = require('../bower_components/leaflet/dist/leaflet');
 
 var LayerModel = require('./model/Layer');
@@ -1793,7 +5160,7 @@ var Router = Backbone.Router.extend({
     routes: {
         '': 'index',
         'ponto-de-interesse/:id': 'show',
-        'noticia/criar': 'noticiaCriar',
+        'noticia/criar/:poi_id': 'noticiaCriar',
         'search/:query': 'search',
         '*default': 'default'
     },
@@ -1831,9 +5198,9 @@ var Router = Backbone.Router.extend({
         }});
     },
 
-    noticiaCriar: function () {
+    noticiaCriar: function (poi_id) {
         jQuery('.modal-noticia-criar').trigger('click');
-        console.log('abrir modal');
+        new SirTrevor.Editor({ el: $('.js-st-instance') });
     },
 
     download: function(random) {
@@ -1854,7 +5221,7 @@ var Router = Backbone.Router.extend({
 
 module.exports = Router;
 
-},{"../bower_components/leaflet/dist/leaflet":3,"./model/GroupLayer":7,"./model/Layer":8,"./model/Poi":9,"./model/Theme":10,"underscore":15}],12:[function(require,module,exports){
+},{"../bower_components/Eventable/eventable":1,"../bower_components/leaflet/dist/leaflet":4,"../bower_components/sir-trevor-js/sir-trevor":6,"./model/GroupLayer":9,"./model/Layer":10,"./model/Poi":11,"./model/Theme":12,"underscore":17}],14:[function(require,module,exports){
 var _ = require('underscore');
 var Backbone = window.Backbone;
 var LayerModel = require('../model/Layer');
@@ -1950,7 +5317,7 @@ module.exports = function (map) {
     return GroupLayerView;
 }
 
-},{"../../bower_components/leaflet/dist/leaflet":3,"../model/Layer":8,"underscore":15}],13:[function(require,module,exports){
+},{"../../bower_components/leaflet/dist/leaflet":4,"../model/Layer":10,"underscore":17}],15:[function(require,module,exports){
 var App = window.App || {};
 var Backbone = window.Backbone;
 var _ = require('underscore');
@@ -1962,14 +5329,14 @@ module.exports = function () {
         el: '.ponto-de-interesse',
         template:  _.template( jQuery('#ponto-de-interesse-info').html()),
         events: {
-            'click .pre-noticia-criar': "zoom"
+            // 'click .pre-noticia-criar': "zoom"
         },
         zoom : function (e) {
             e.preventDefault();
 
 
             // console.log(e.currentTarget.href);
-            App.Router.navigate('noticia/criar', {trigger: true})
+            // App.Router.navigate(e.currentTarget.href, {trigger: true})
             // var link = jQuery(e.currentTarget);
 
             // var layer_id = link.data('layer-id');
@@ -1993,7 +5360,7 @@ module.exports = function () {
     return PoiView;
 };
 
-},{"underscore":15}],14:[function(require,module,exports){
+},{"underscore":17}],16:[function(require,module,exports){
 var App = window.App || {};
 var Backbone = window.Backbone;
 var _ = require('underscore');
@@ -2093,7 +5460,7 @@ module.exports = function (map) {
     return ThemeView;
 };
 
-},{"../../bower_components/leaflet/dist/leaflet":3,"../model/Layer":8,"underscore":15}],15:[function(require,module,exports){
+},{"../../bower_components/leaflet/dist/leaflet":4,"../model/Layer":10,"underscore":17}],17:[function(require,module,exports){
 //     Underscore.js 1.7.0
 //     http://underscorejs.org
 //     (c) 2009-2014 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
@@ -3510,4 +6877,4 @@ module.exports = function (map) {
   }
 }.call(this));
 
-},{}]},{},[5])
+},{}]},{},[7])

@@ -50,10 +50,13 @@ block body
 
     script(type="text/template", id="ponto-de-interesse-info")
         .box
-            a.pre-noticia-criar(href="#noticia/criar") Nova Notícia
+            a.pre-noticia-criar(href!="#noticia/criar/<%= poi._id %>") Nova Notícia
             a.modal-noticia-criar(href="#", data-modal-target="#overlay1")
             #overlay1.hidden
-                p Lorem ipsum dolor sit amet...
+                form#criar-noticia-form
+                    textarea.js-st-instance
+
+
             ul
                 <% _.each(poi.properties, function(v,k) { %>
                 li
