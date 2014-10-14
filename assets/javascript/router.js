@@ -1,11 +1,8 @@
 var App = window.App || {};
 
-window._ = require('underscore');
-window.Eventable = require('../bower_components/Eventable/eventable');
-require('../bower_components/sir-trevor-js/sir-trevor');
-
+var _ = require('underscore');
 var L = require('../bower_components/leaflet/dist/leaflet');
-
+var Quill = require('../bower_components/quill/dist/quill.min');
 var LayerModel = require('./model/Layer');
 var ThemeModel = require('./model/Theme');
 var GroupLayerModel = require('./model/GroupLayer');
@@ -55,7 +52,14 @@ var Router = Backbone.Router.extend({
 
     noticiaCriar: function (poi_id) {
         jQuery('.modal-noticia-criar').trigger('click');
-        new SirTrevor.Editor({ el: $('.js-st-instance') });
+        var quill = new Quill('#editor', {
+            modules: {
+              'toolbar': { container: '#toolbar' },
+              'image-tooltip': true,
+              'link-tooltip': true
+            },
+            theme: 'snow'
+        });
     },
 
     download: function(random) {

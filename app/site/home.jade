@@ -53,8 +53,18 @@ block body
             a.pre-noticia-criar(href!="#noticia/criar/<%= poi._id %>") Nova Notícia
             a.modal-noticia-criar(href="#", data-modal-target="#overlay1")
             #overlay1.hidden
-                form#criar-noticia-form
-                    textarea.js-st-instance
+                .container
+                    form#criar-noticia
+                        h3 Inserir Notícia
+
+                        label(for="titulo")
+                            input(name="titulo")
+
+                        include ../_editor
+
+                        input(type="submit", value="salvar")
+
+
 
 
             ul
