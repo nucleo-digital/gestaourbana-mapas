@@ -9,25 +9,29 @@ module.exports = function () {
         el: '.ponto-de-interesse',
         template:  _.template( jQuery('#ponto-de-interesse-info').html()),
         events: {
-            'click a.layer': "zoom"
+            'click .pre-noticia-criar': "zoom"
         },
         zoom : function (e) {
             e.preventDefault();
-            var link = jQuery(e.currentTarget);
 
-            var layer_id = link.data('layer-id');
-            var myLayer = L_layer_theme.getLayer(layer_id);
-            map.fitBounds(myLayer.getBounds());
 
-            if ($.support.currentGrid().grid == 'xs') {
-                jQuery('.mobile-sidebar').trigger('click');
-            }
+            // console.log(e.currentTarget.href);
+            App.Router.navigate('noticia/criar', {trigger: true})
+            // var link = jQuery(e.currentTarget);
+
+            // var layer_id = link.data('layer-id');
+            // var myLayer = L_layer_theme.getLayer(layer_id);
+            // map.fitBounds(myLayer.getBounds());
+
+            // if ($.support.currentGrid().grid == 'xs') {
+            //     jQuery('.mobile-sidebar').trigger('click');
+            // }
         },
         initialize: function() {
             this.render();
         },
         render: function() {
-            this.$el.html(this.template({theme: this.model.toJSON()}));
+            this.$el.html(this.template({poi: this.model.toJSON()}));
 
             return this;
         }

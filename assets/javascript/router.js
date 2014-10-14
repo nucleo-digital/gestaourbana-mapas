@@ -12,7 +12,7 @@ var Router = Backbone.Router.extend({
     routes: {
         '': 'index',
         'ponto-de-interesse/:id': 'show',
-        'download/*random': 'download',
+        'noticia/criar': 'noticiaCriar',
         'search/:query': 'search',
         '*default': 'default'
     },
@@ -48,6 +48,11 @@ var Router = Backbone.Router.extend({
                 model:poi
             });
         }});
+    },
+
+    noticiaCriar: function () {
+        jQuery('.modal-noticia-criar').trigger('click');
+        console.log('abrir modal');
     },
 
     download: function(random) {

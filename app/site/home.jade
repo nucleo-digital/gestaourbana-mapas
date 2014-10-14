@@ -50,4 +50,14 @@ block body
 
     script(type="text/template", id="ponto-de-interesse-info")
         .box
-            p testetttt
+            a.pre-noticia-criar(href="#noticia/criar") Nova Notícia
+            a.modal-noticia-criar(href="#", data-modal-target="#overlay1")
+            #overlay1.hidden
+                p Lorem ipsum dolor sit amet...
+            ul
+                <% _.each(poi.properties, function(v,k) { %>
+                li
+                    //- a.layer(data-layer-id!="<%= layer._id %>",href!="/layer/<%= layer._id %>")
+                    strong <%= k %>
+                    | : <%= v %>
+                <% }); %>
