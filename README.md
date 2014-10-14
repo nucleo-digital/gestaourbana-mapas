@@ -1,12 +1,12 @@
 # Gestão Urbana Mapas
 
-A necessidade de disponibilizar os mais diversos mapas da cidade publicamente, foi o que nos trouxe até esta ferramenta.
+A necessidade de disponibilizar os mais diversos mapas da cidade publicamente, foi o que nos levou até esta ferramenta.
 
 ## Benefícios
 
-O principal atrativo é você acompanhar as notícias por ponto de interesse e fazer um mix com as camadas relacionadas, conseguindo criar visões, a partir do carregamento das camadas do Plano Diretor ou Programa de metas;
+O principal atrativo é você acompanhar as notícias por ponto de interesse e fazer um mix com as camadas relacionadas, conseguindo criar visões únicas, a partir da mescla de informações sobre o Plano Diretor e o Programa de metas;
 
-* Camadas em destaque dividido tema
+* Camadas em destaque por tema
 * Notícias por ponto de interesse do tema;
 * Camadas relacionadas por projetos das secretarias;
 
