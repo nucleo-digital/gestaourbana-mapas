@@ -2,12 +2,12 @@ var App = window.App || {};
 
 var _ = require('underscore');
 var L = require('../bower_components/leaflet/dist/leaflet');
-var Quill = require('../bower_components/quill/dist/quill.min');
+
 var LayerModel = require('./model/Layer');
 var ThemeModel = require('./model/Theme');
 var GroupLayerModel = require('./model/GroupLayer');
 var PoiModel = require('./model/Poi');
-
+var NewsModel = require('./model/News');
 var Router = Backbone.Router.extend({
     routes: {
         '': 'index',
@@ -51,15 +51,10 @@ var Router = Backbone.Router.extend({
     },
 
     noticiaCriar: function (poi_id) {
-        jQuery('.modal-noticia-criar').trigger('click');
-        var quill = new Quill('#editor', {
-            modules: {
-              'toolbar': { container: '#toolbar' },
-              'image-tooltip': true,
-              'link-tooltip': true
-            },
-            theme: 'snow'
-        });
+        var newsEntry = new NewsModel({'poi':poi_id});
+        var h = new App.NewsView({
+                model:newsEntry
+            });
     },
 
     download: function(random) {

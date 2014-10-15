@@ -1617,7 +1617,7 @@
 
 }));
 
-},{"underscore":16}],3:[function(require,module,exports){
+},{"underscore":18}],3:[function(require,module,exports){
 /*
  Leaflet, a JavaScript library for mobile-friendly interactive maps. http://leafletjs.com
  (c) 2010-2013, Vladimir Agafonkin
@@ -1722,13 +1722,14 @@ window.App = App;
 App.GroupLayerView = require('./view/GroupLayer')(map);
 App.ThemeView = require('./view/Theme')(map);
 App.PoiView = require('./view/Poi')();
+App.NewsView = require('./view/News')();
 
 var Router = require('./router');
 
 App.Router = new Router;
 Backbone.history.start();
 
-},{"../bower_components/Sharrre/jquery.sharrre.min":1,"../bower_components/backbone/backbone":2,"../bower_components/leaflet/dist/leaflet":3,"../bower_components/responsive/build/responsive.min":5,"./router":12,"./view/GroupLayer":13,"./view/Poi":14,"./view/Theme":15}],7:[function(require,module,exports){
+},{"../bower_components/Sharrre/jquery.sharrre.min":1,"../bower_components/backbone/backbone":2,"../bower_components/leaflet/dist/leaflet":3,"../bower_components/responsive/build/responsive.min":5,"./router":13,"./view/GroupLayer":14,"./view/News":15,"./view/Poi":16,"./view/Theme":17}],7:[function(require,module,exports){
 var Backbone = window.Backbone;
 var LayerModel = require('../model/Layer');
 
@@ -1768,6 +1769,20 @@ var Backbone = window.Backbone;
 
 module.exports = Backbone.Model.extend({
     attributes : {
+        'title': 'Sem título',
+        'poi': 0,
+        'description': '<p>Adicione texto, imagem ou vídeo embed ao corpor da mensagem.</p>',
+        'created_at': Date.now
+    },
+    idAttribute: "_id",
+    urlRoot: '/news'
+});
+
+},{}],11:[function(require,module,exports){
+var Backbone = window.Backbone;
+
+module.exports = Backbone.Model.extend({
+    attributes : {
         'name': 'Empty Poi',
         'features': {},
         'created_at': Date.now
@@ -1776,7 +1791,7 @@ module.exports = Backbone.Model.extend({
     urlRoot: '/poi'
 });
 
-},{}],11:[function(require,module,exports){
+},{}],12:[function(require,module,exports){
 var Backbone = window.Backbone;
 var LayerCollection = require('../collection/Layer');
 
@@ -1790,17 +1805,17 @@ module.exports = Backbone.Model.extend({
         url: '/themes/active'
     });
 
-},{"../collection/Layer":7}],12:[function(require,module,exports){
+},{"../collection/Layer":7}],13:[function(require,module,exports){
 var App = window.App || {};
 
 var _ = require('underscore');
 var L = require('../bower_components/leaflet/dist/leaflet');
-var Quill = require('../bower_components/quill/dist/quill.min');
+
 var LayerModel = require('./model/Layer');
 var ThemeModel = require('./model/Theme');
 var GroupLayerModel = require('./model/GroupLayer');
 var PoiModel = require('./model/Poi');
-
+var NewsModel = require('./model/News');
 var Router = Backbone.Router.extend({
     routes: {
         '': 'index',
@@ -1844,15 +1859,10 @@ var Router = Backbone.Router.extend({
     },
 
     noticiaCriar: function (poi_id) {
-        jQuery('.modal-noticia-criar').trigger('click');
-        var quill = new Quill('#editor', {
-            modules: {
-              'toolbar': { container: '#toolbar' },
-              'image-tooltip': true,
-              'link-tooltip': true
-            },
-            theme: 'snow'
-        });
+        var newsEntry = new NewsModel({'poi':poi_id});
+        var h = new App.NewsView({
+                model:newsEntry
+            });
     },
 
     download: function(random) {
@@ -1873,7 +1883,7 @@ var Router = Backbone.Router.extend({
 
 module.exports = Router;
 
-},{"../bower_components/leaflet/dist/leaflet":3,"../bower_components/quill/dist/quill.min":4,"./model/GroupLayer":8,"./model/Layer":9,"./model/Poi":10,"./model/Theme":11,"underscore":16}],13:[function(require,module,exports){
+},{"../bower_components/leaflet/dist/leaflet":3,"./model/GroupLayer":8,"./model/Layer":9,"./model/News":10,"./model/Poi":11,"./model/Theme":12,"underscore":18}],14:[function(require,module,exports){
 var _ = require('underscore');
 var Backbone = window.Backbone;
 var LayerModel = require('../model/Layer');
@@ -1969,22 +1979,25 @@ module.exports = function (map) {
     return GroupLayerView;
 }
 
-},{"../../bower_components/leaflet/dist/leaflet":3,"../model/Layer":9,"underscore":16}],14:[function(require,module,exports){
+},{"../../bower_components/leaflet/dist/leaflet":3,"../model/Layer":9,"underscore":18}],15:[function(require,module,exports){
 var App = window.App || {};
 var Backbone = window.Backbone;
 var _ = require('underscore');
 
+var Quill = require('../../bower_components/quill/dist/quill.min');
+
 module.exports = function () {
 
-    var PoiView = Backbone.View.extend({
+    var NewsView = Backbone.View.extend({
         tagName: 'div',
-        el: '.ponto-de-interesse',
-        template:  _.template( jQuery('#ponto-de-interesse-info').html()),
+        el: '.news-container',
+
+        template:  _.template( jQuery('#criar-noticia-modal').html()),
         events: {
-            // 'click .pre-noticia-criar': "zoom"
+            'click .submit': "salvarNoticia"
         },
-        zoom : function (e) {
-            e.preventDefault();
+        salvarNoticia : function (e) {
+            var form = jQuery('form#criar-noticia');
 
 
             // console.log(e.currentTarget.href);
@@ -2002,6 +2015,39 @@ module.exports = function () {
         initialize: function() {
             this.render();
         },
+
+        render: function() {
+            this.$el.html(this.template({poi: this.model.toJSON()}));
+            var quill = new Quill('#editor', {
+                modules: {
+                  'toolbar': { container: '#toolbar' },
+                  'image-tooltip': true,
+                  'link-tooltip': true
+                },
+                theme: 'snow'
+            });
+            jQuery('.modal-noticia-criar').trigger('click');
+            return this;
+        }
+    });
+
+    return NewsView;
+};
+
+},{"../../bower_components/quill/dist/quill.min":4,"underscore":18}],16:[function(require,module,exports){
+var App = window.App || {};
+var Backbone = window.Backbone;
+var _ = require('underscore');
+
+module.exports = function () {
+
+    var PoiView = Backbone.View.extend({
+        tagName: 'div',
+        el: '.ponto-de-interesse',
+        template:  _.template( jQuery('#ponto-de-interesse-info').html()),
+        initialize: function() {
+            this.render();
+        },
         render: function() {
             this.$el.html(this.template({poi: this.model.toJSON()}));
 
@@ -2012,7 +2058,7 @@ module.exports = function () {
     return PoiView;
 };
 
-},{"underscore":16}],15:[function(require,module,exports){
+},{"underscore":18}],17:[function(require,module,exports){
 var App = window.App || {};
 var Backbone = window.Backbone;
 var _ = require('underscore');
@@ -2112,7 +2158,7 @@ module.exports = function (map) {
     return ThemeView;
 };
 
-},{"../../bower_components/leaflet/dist/leaflet":3,"../model/Layer":9,"underscore":16}],16:[function(require,module,exports){
+},{"../../bower_components/leaflet/dist/leaflet":3,"../model/Layer":9,"underscore":18}],18:[function(require,module,exports){
 //     Underscore.js 1.7.0
 //     http://underscorejs.org
 //     (c) 2009-2014 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors

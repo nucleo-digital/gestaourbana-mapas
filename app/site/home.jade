@@ -1,5 +1,6 @@
 extends ../layout
 block body
+    .news-container
     .row.no-gutter
         #sidebar.col-xs-12.col-s-3.desativado
             .theme
@@ -43,7 +44,6 @@ block body
             ul
                 <% _.each(feature.properties, function(v,k) { %>
                 li
-                    //- a.layer(data-layer-id!="<%= layer._id %>",href!="/layer/<%= layer._id %>")
                     strong <%= k %>
                     | : <%= v %>
                 <% }); %>
@@ -51,26 +51,24 @@ block body
     script(type="text/template", id="ponto-de-interesse-info")
         .box
             a.pre-noticia-criar(href!="#noticia/criar/<%= poi._id %>") Nova Notícia
-            a.modal-noticia-criar(href="#", data-modal-target="#overlay1")
-            #overlay1.hidden
-                .container
-                    form#criar-noticia
-                        h3 Inserir Notícia
-
-                        label(for="titulo")
-                            input(name="titulo")
-
-                        include ../_editor
-
-                        input(type="submit", value="salvar")
-
-
-
-
             ul
                 <% _.each(poi.properties, function(v,k) { %>
                 li
-                    //- a.layer(data-layer-id!="<%= layer._id %>",href!="/layer/<%= layer._id %>")
                     strong <%= k %>
                     | : <%= v %>
                 <% }); %>
+
+
+    script(type="text/template", id="criar-noticia-modal")
+        a.modal-noticia-criar(href="#", data-modal-target="#overlay1")
+        #overlay1.hidden
+            .container
+            form#criar-noticia
+                h3 Inserir Notícia
+
+                label(for="titulo")
+                    input(name="titulo")
+
+                include ../_editor
+
+                input.submit(type="submit", value="salvar")

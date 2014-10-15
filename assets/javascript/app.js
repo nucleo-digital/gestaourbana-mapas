@@ -76,6 +76,7 @@ window.App = App;
 App.GroupLayerView = require('./view/GroupLayer')(map);
 App.ThemeView = require('./view/Theme')(map);
 App.PoiView = require('./view/Poi')();
+App.NewsView = require('./view/News')();
 
 var Router = require('./router');
 
