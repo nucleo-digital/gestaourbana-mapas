@@ -35,16 +35,23 @@ module.exports = function () {
         },
 
         render: function() {
-            this.$el.html(this.template({poi: this.model.toJSON()}));
-            var quill = new Quill('#editor', {
-                modules: {
-                  'toolbar': { container: '#toolbar' },
-                  'image-tooltip': true,
-                  'link-tooltip': true
-                },
-                theme: 'snow'
+            this.$el.html(this.template({poi: this.model.toJSON()}))
+            .promise().done(function () {
+                var quill = new Quill('#editor', {
+                    modules: {
+                      'toolbar': { container: '#toolbar' },
+                      'image-tooltip': true,
+                      'link-tooltip': true
+                    },
+                    theme: 'snow'
+                });
+                // jQuery('#overlay1').modal('show');
+                jQuery('.modal-noticia-criar').modal('show');
+                // .trigger('click');
             });
-            jQuery('.modal-noticia-criar').trigger('click');
+
+
+
             return this;
         }
     });
