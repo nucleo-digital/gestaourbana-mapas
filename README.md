@@ -37,7 +37,3 @@ Você vai precisar configurar as informações sobre o mongo no ```config.js``` 
 ## Importar camadas
 
 As camadas utilizadas nesse projeto foram disponibilizdas no repositório [SP Mapas](https://github.com/nucleo-digital/sp-mapas) e a partir dele você pode importar as camadas do formato GeoJSON para o MongoDB.
-
-## Licença
-
-[GPL v3](https://github.com/nucleo-digital/gestaourbana-mapas/blob/master/LICENSE)
